@@ -17,31 +17,75 @@ S:AddCallback("Skin_Misc", function()
 	local bd = GameMenuFrame.backdrop
 	bd:ClearAllPoints()
 	bd:SetPoint("TOPLEFT",  GameMenuFrame, "TOPLEFT", 0, 0)
-	bd:SetPoint("BOTTOMRIGHT", GameMenuFrame, "BOTTOMRIGHT", 0, -18)
+	bd:SetPoint("BOTTOMRIGHT", GameMenuFrame, "BOTTOMRIGHT", 0, -45)
 
 	GameMenuFrameHeader:Point("TOP", 0, 7)
 
-	local menuButtons = {
-		GameMenuButtonHelp,
-		GameMenuButtonOptions,
-		GameMenuButtonSoundOptions,
-		GameMenuButtonUIOptions,
-	--	GameMenuButtonMacOptions,
-		GameMenuButtonKeybindings,
-		GameMenuButtonMacros,
-	--	GameMenuButtonRatings,
-		GameMenuButtonLogout,
-		GameMenuButtonQuit,
-		GameMenuButtonContinue,
+	local feedbackButton = _G.GameMenuButtonFeedback or _G.GameMenuButtonFeedbeck
+	local addonsButton = _G.GameMenuButtonAddons or _G.GameMenuButtonAddOns
 
-		ElvUI_MenuButton
-	}
+	if feedbackButton then
+		feedbackButton:SetScript("OnShow", nil)
+	end
+
+	if addonsButton then
+		addonsButton:ClearAllPoints()
+		addonsButton:Kill()
+	end
+
+	local menuButtons = {}
+
+	local function AddMenuButton(button)
+		if button then
+			menuButtons[#menuButtons + 1] = button
+		end
+	end
+
+	AddMenuButton(GameMenuButtonHelp)
+	AddMenuButton(feedbackButton)
+	AddMenuButton(GameMenuButtonOptions)
+	AddMenuButton(GameMenuButtonSoundOptions)
+	AddMenuButton(GameMenuButtonUIOptions)
+	AddMenuButton(GameMenuButtonKeybindings)
+	AddMenuButton(GameMenuButtonMacros)
+	AddMenuButton(ElvUI_MenuButton)
+	AddMenuButton(GameMenuButtonLogout)
+	AddMenuButton(GameMenuButtonQuit)
+	AddMenuButton(GameMenuButtonContinue)
 
 	for i = 1, #menuButtons do
-		local button = menuButtons[i]
-		if button then
-			S:HandleButton(menuButtons[i])
+		S:HandleButton(menuButtons[i])
+	end
+
+	local function UpdateGameMenuLayout()
+	if addonsButton then
+		addonsButton:ClearAllPoints()
+		addonsButton:Hide()
+	end
+
+	local lastButton = GameMenuButtonHelp
+
+		for i = 2, #menuButtons do
+			local button = menuButtons[i]
+
+			if button and button:IsShown() and lastButton then
+				button:ClearAllPoints()
+				local offsetY = -1
+
+				if lastButton == feedbackButton and button == GameMenuButtonOptions then
+					offsetY = -16
+				end
+
+				button:Point("TOP", lastButton, "BOTTOM", 0, offsetY)
+				lastButton = button
+			end
 		end
+	end
+
+	UpdateGameMenuLayout()
+
+	if type(_G.GameMenuFrame_Update) == "function" then
+		hooksecurefunc("GameMenuFrame_Update", UpdateGameMenuLayout)
 	end
 
 	-- Static Popups
