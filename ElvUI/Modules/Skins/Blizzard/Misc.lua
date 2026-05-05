@@ -21,71 +21,199 @@ S:AddCallback("Skin_Misc", function()
 
 	GameMenuFrameHeader:Point("TOP", 0, 7)
 
-	local feedbackButton = _G.GameMenuButtonFeedback or _G.GameMenuButtonFeedbeck
-	local addonsButton = _G.GameMenuButtonAddons or _G.GameMenuButtonAddOns
+	local handledButtons = {}
+	local hookedButtons = {}
 
-	if feedbackButton then
-		feedbackButton:SetScript("OnShow", nil)
+	local function GetFeedbackButton()
+		return _G.GameMenuButtonFeedback or _G.GameMenuButtonFeedbeck
 	end
 
-	if addonsButton then
-		addonsButton:ClearAllPoints()
-		addonsButton:Kill()
+	local function GetAddonsButton()
+		return _G.GameMenuButtonAddons or _G.GameMenuButtonAddOns
 	end
 
-	local menuButtons = {}
-
-	local function AddMenuButton(button)
-		if button then
-			menuButtons[#menuButtons + 1] = button
+	local function SkinGameMenuButton(button)
+		if button and not handledButtons[button] then
+			S:HandleButton(button)
+			handledButtons[button] = true
 		end
 	end
 
-	AddMenuButton(GameMenuButtonHelp)
-	AddMenuButton(feedbackButton)
-	AddMenuButton(GameMenuButtonOptions)
-	AddMenuButton(GameMenuButtonSoundOptions)
-	AddMenuButton(GameMenuButtonUIOptions)
-	AddMenuButton(GameMenuButtonKeybindings)
-	AddMenuButton(GameMenuButtonMacros)
-	AddMenuButton(ElvUI_MenuButton)
-	AddMenuButton(GameMenuButtonLogout)
-	AddMenuButton(GameMenuButtonQuit)
-	AddMenuButton(GameMenuButtonContinue)
+	local function HideAddonsButton()
+		local addonsButton = GetAddonsButton()
 
-	for i = 1, #menuButtons do
-		S:HandleButton(menuButtons[i])
+		if addonsButton then
+			addonsButton:SetScript("OnShow", nil)
+			addonsButton:ClearAllPoints()
+			addonsButton:Hide()
+			addonsButton:SetAlpha(0)
+			addonsButton:EnableMouse(false)
+
+			addonsButton.Show = addonsButton.Hide
+		end
+	end
+
+	local UpdateGameMenuLayout
+
+	local function ScheduleGameMenuLayout()
+		UpdateGameMenuLayout()
+
+		if C_Timer and C_Timer.After then
+			C_Timer.After(0, UpdateGameMenuLayout)
+			C_Timer.After(0.05, UpdateGameMenuLayout)
+			C_Timer.After(0.15, UpdateGameMenuLayout)
+		end
+	end
+
+	local function HookButtonLayout(button)
+		if button and not hookedButtons[button] then
+			button:HookScript("OnShow", ScheduleGameMenuLayout)
+			hookedButtons[button] = true
+		end
+	end
+
+	UpdateGameMenuLayout = function()
+		local feedbackButton = GetFeedbackButton()
+
+		if feedbackButton then
+			feedbackButton:SetScript("OnShow", nil)
+		end
+
+		HideAddonsButton()
+
+	local handledButtons = {}
+	local layoutTicker = CreateFrame("Frame")
+	layoutTicker:Hide()
+
+	local function GetFeedbackButton()
+		return _G.GameMenuButtonFeedback or _G.GameMenuButtonFeedbeck
+	end
+
+	local function GetBlizzardAddonsButton()
+		return _G.GameMenuButtonAddons or _G.GameMenuButtonAddOns
+	end
+
+	local function KillBlizzardAddonsButton()
+		local button = GetBlizzardAddonsButton()
+
+		if button then
+			button:SetScript("OnShow", nil)
+			button:SetScript("OnClick", nil)
+			button:ClearAllPoints()
+			button:SetAlpha(0)
+			button:EnableMouse(false)
+			button:Hide()
+
+			button.Show = function(self)
+				self:Hide()
+			end
+		end
+	end
+
+	local function SkinGameMenuButton(button)
+		if button and not handledButtons[button] then
+			S:HandleButton(button)
+			handledButtons[button] = true
+		end
 	end
 
 	local function UpdateGameMenuLayout()
-	if addonsButton then
-		addonsButton:ClearAllPoints()
-		addonsButton:Hide()
-	end
+		local feedbackButton = GetFeedbackButton()
 
-	local lastButton = GameMenuButtonHelp
+		if feedbackButton then
+			feedbackButton:SetScript("OnShow", nil)
+		end
 
-		for i = 2, #menuButtons do
+		KillBlizzardAddonsButton()
+
+		local menuButtons = {
+			_G.GameMenuButtonHelp,
+			feedbackButton,
+
+			_G.GameMenuButtonOptions,
+			_G.GameMenuButtonSoundOptions,
+			_G.GameMenuButtonUIOptions,
+			_G.GameMenuButtonKeybindings,
+			_G.GameMenuButtonMacros,
+			_G.ElvUI_AddonListButton,
+
+			_G.ElvUI_MenuButton,
+
+			_G.GameMenuButtonLogout,
+			_G.GameMenuButtonQuit,
+			_G.GameMenuButtonContinue,
+		}
+
+		local lastButton
+
+		for i = 1, #menuButtons do
 			local button = menuButtons[i]
 
-			if button and button:IsShown() and lastButton then
-				button:ClearAllPoints()
-				local offsetY = -1
+			if button and button:IsShown() then
+				SkinGameMenuButton(button)
 
-				if lastButton == feedbackButton and button == GameMenuButtonOptions then
-					offsetY = -16
+				button:SetParent(GameMenuFrame)
+				button:ClearAllPoints()
+
+				if not lastButton then
+					button:Point("TOP", GameMenuFrame, "TOP", 0, -28)
+				else
+					local offsetY = -1
+
+					if lastButton == feedbackButton and button == _G.GameMenuButtonOptions then
+						offsetY = -16
+					end
+
+					if lastButton == _G.ElvUI_MenuButton and button == _G.GameMenuButtonLogout then
+						offsetY = -16
+					end
+
+					button:Point("TOP", lastButton, "BOTTOM", 0, offsetY)
 				end
 
-				button:Point("TOP", lastButton, "BOTTOM", 0, offsetY)
 				lastButton = button
 			end
 		end
 	end
 
-	UpdateGameMenuLayout()
+	local function ScheduleGameMenuLayout()
+		UpdateGameMenuLayout()
+
+		layoutTicker.elapsed = 0
+		layoutTicker.count = 0
+		layoutTicker:Show()
+	end
+
+	layoutTicker:SetScript("OnUpdate", function(self, elapsed)
+		self.elapsed = self.elapsed + elapsed
+
+		if self.elapsed < 0.05 then return end
+
+		self.elapsed = 0
+		self.count = self.count + 1
+
+		UpdateGameMenuLayout()
+
+		if self.count >= 6 then
+			self:Hide()
+		end
+	end)
+
+	ScheduleGameMenuLayout()
+
+	GameMenuFrame:HookScript("OnShow", ScheduleGameMenuLayout)
 
 	if type(_G.GameMenuFrame_Update) == "function" then
-		hooksecurefunc("GameMenuFrame_Update", UpdateGameMenuLayout)
+		hooksecurefunc("GameMenuFrame_Update", ScheduleGameMenuLayout)
+	end
+	end
+
+	ScheduleGameMenuLayout()
+
+	GameMenuFrame:HookScript("OnShow", ScheduleGameMenuLayout)
+
+	if type(_G.GameMenuFrame_Update) == "function" then
+		hooksecurefunc("GameMenuFrame_Update", ScheduleGameMenuLayout)
 	end
 
 	-- Static Popups
