@@ -11,6 +11,7 @@ local CopyTable = CopyTable
 local GetAddOnCPUUsage = GetAddOnCPUUsage
 local GetAddOnInfo = GetAddOnInfo
 local GetAddOnMemoryUsage = GetAddOnMemoryUsage
+local GetCVar = GetCVar
 local GetFramerate = GetFramerate
 local GetNetStats = GetNetStats
 local GetNumAddOns = GetNumAddOns
@@ -25,7 +26,6 @@ local UpdateAddOnCPUUsage = UpdateAddOnCPUUsage
 local UpdateAddOnMemoryUsage = UpdateAddOnMemoryUsage
 
 local cpuProfiling = GetCVar("scriptProfile") == "1"
-
 local int = 5 -- initial delay
 local statusColors = {
 	"|cff0CD809",
@@ -38,6 +38,8 @@ local enteredFrame
 local homeLatencyString = "%d ms"
 local kiloByteString = "%d kb"
 local megaByteString = "%.2f mb"
+local system_display_latency = "LATENCY"
+local system_display_memory = "MEMORY"
 
 local memoryTable = {}
 local cpuTable = {}
@@ -150,6 +152,84 @@ local function ToggleGameMenuFrame()
 	end
 end
 
+--- @brief Возвращает цветовую escape-строку для текущего FPS.
+--- @param framerate number Текущее количество кадров в секунду.
+--- @return string Цветовая escape-строка для значения FPS.
+local function get_framerate_color(framerate)
+	return statusColors[framerate >= 30 and 1 or (framerate >= 20 and framerate < 30) and 2 or (framerate >= 10 and framerate < 20) and 3 or 4]
+end
+
+--- @brief Возвращает цветовую escape-строку для текущей задержки.
+--- @param latency number Текущая домашняя задержка в миллисекундах.
+--- @return string Цветовая escape-строка для значения задержки.
+local function get_latency_color(latency)
+	return statusColors[latency < 150 and 1 or (latency >= 150 and latency < 300) and 2 or (latency >= 300 and latency < 500) and 3 or 4]
+end
+
+--- @brief Обновляет основной текст системного дататекста согласно выбранному режиму отображения.
+--- @param self frame Панель дататекста, текст которой нужно обновить.
+--- @return nil
+local function update_system_text(self)
+	local framerate = floor(GetFramerate() + 0.5)
+	local system_display = E.db.datatexts.system_display or system_display_latency
+
+	if system_display == system_display_memory then
+		self.text:SetFormattedText("FPS: %s%d|r MEM: %s", get_framerate_color(framerate), framerate, formatMem(UpdateMemory()))
+	else
+		local _, _, homeLatency = GetNetStats()
+
+		self.text:SetFormattedText("FPS: %s%d|r MS: %s%d|r",
+			get_framerate_color(framerate),
+			framerate,
+			get_latency_color(homeLatency),
+			homeLatency)
+	end
+end
+
+--- @brief Возвращает режим отображения списка аддонов в подсказке с учётом Shift.
+--- @return string Режим отображения: LATENCY или MEMORY.
+local function get_tooltip_display()
+	local tooltip_display = E.db.datatexts.system_tooltip_display or system_display_latency
+
+	if not cpuProfiling then
+		return system_display_memory
+	elseif IsShiftKeyDown() then
+		return tooltip_display == system_display_memory and system_display_latency or system_display_memory
+	else
+		return tooltip_display
+	end
+end
+
+--- @brief Добавляет в подсказку список аддонов с использованием памяти.
+--- @param total_memory number Суммарное использование памяти всеми отслеживаемыми аддонами.
+--- @return nil
+local function add_memory_tooltip_lines(total_memory)
+	local addon, red, green
+	local color_total = total_memory > 0 and total_memory or 1
+
+	for i = 1, #memoryTable do
+		addon = memoryTable[i]
+		red = addon[3] / color_total
+		green = 1 - red
+		DT.tooltip:AddDoubleLine(addon[2], formatMem(addon[3]), 1, 1, 1, red, green + .5, 0)
+	end
+end
+
+--- @brief Добавляет в подсказку список аддонов с временем выполнения.
+--- @param total_cpu number Суммарное время выполнения всех отслеживаемых аддонов.
+--- @return nil
+local function add_latency_tooltip_lines(total_cpu)
+	local addon, red, green
+	local color_total = total_cpu > 0 and total_cpu or 1
+
+	for i = 1, #cpuTable do
+		addon = cpuTable[i]
+		red = addon[3] / color_total
+		green = 1 - red
+		DT.tooltip:AddDoubleLine(addon[2], format(homeLatencyString, addon[3]), 1, 1, 1, red, green + .5, 0)
+	end
+end
+
 local function OnClick(_, btn)
 	if IsModifierKeyDown() then
 		collectgarbage("collect")
@@ -176,25 +256,10 @@ local function OnEnter(self)
 
 	DT.tooltip:AddLine(" ")
 
-	local addon, red, green
-
-	if IsShiftKeyDown() or not cpuProfiling then
-		for i = 1, #memoryTable do
-			addon = memoryTable[i]
-			red = addon[3] / totalMemory
-			green = 1 - red
-			DT.tooltip:AddDoubleLine(addon[2], formatMem(addon[3]), 1, 1, 1, red, green + .5, 0)
-		end
+	if get_tooltip_display() == system_display_memory then
+		add_memory_tooltip_lines(totalMemory)
 	else
-		for i = 1, #cpuTable do
-			addon = cpuTable[i]
-			red = addon[3] / totalCPU
-			green = 1 - red
-			DT.tooltip:AddDoubleLine(addon[2], format(homeLatencyString, addon[3]), 1, 1, 1, red, green + .5, 0)
-		end
-
-		DT.tooltip:AddLine(" ")
-		DT.tooltip:AddLine(L["(Hold Shift) Memory Usage"])
+		add_latency_tooltip_lines(totalCPU)
 	end
 
 	DT.tooltip:AddLine(L["(Modifer Click) Collect Garbage"])
@@ -211,15 +276,7 @@ local function OnUpdate(self, t)
 	int = int - t
 
 	if int < 0 then
-		local framerate = floor(GetFramerate() + 0.5)
-		local _, _, homeLatency = GetNetStats()
-
-		self.text:SetFormattedText("FPS: %s%d|r MS: %s%d|r",
-			statusColors[framerate >= 30 and 1 or (framerate >= 20 and framerate < 30) and 2 or (framerate >= 10 and framerate < 20) and 3 or 4],
-			framerate,
-			statusColors[homeLatency < 150 and 1 or (homeLatency >= 150 and homeLatency < 300) and 2 or (homeLatency >= 300 and homeLatency < 500) and 3 or 4],
-			homeLatency)
-
+		update_system_text(self)
 		int = 1
 
 		if enteredFrame then
