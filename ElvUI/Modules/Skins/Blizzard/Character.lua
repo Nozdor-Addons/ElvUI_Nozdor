@@ -1099,24 +1099,14 @@ local function FindHeaderFS(row)
 end
 
 local function StyleHeader(row)
-  KillTex(row)
+  -- The server renders currency category headers itself: a commonbuttons catPlate,
+  -- a grey "+/-" catSign at the right (RIGHT -14) and a left-aligned label -- exactly
+  -- like the skills tab. The old code wiped that (KillTex nils the row's textures,
+  -- incl. the catPlate) and re-centred the label, so we had to add our own plate on
+  -- top and the +/- ended up under it. Leave the server styling alone; just hide the
+  -- leftover old category art.
   for _,r in next,{row.CategoryLeft,row.CategoryRight,row.CategoryMiddle,row.Left,row.Right,row.Middle,row.Bg,row.Background,row.Highlight} do if r and r.Hide then r:Hide() end end
-  if row.Highlight then row.Highlight:Hide() end
   if row.__hdr then row.__hdr:Hide() end
-  local fs=FindHeaderFS(row)
-  if fs then
-    -- Currency rows sit at frame level 0, so the plate holder can't go behind them;
-    -- put the label ON the holder instead, above the plate, so it isn't covered.
-    local host = row.__euiHdrPlate or row
-    fs:SetParent(host)
-    fs:ClearAllPoints()
-    fs:SetPoint("CENTER",host,"CENTER",-8,0)
-    fs:SetDrawLayer("OVERLAY",7)
-    fs:SetAlpha(1)
-    fs:Show()
-  end
-  local collapse=row.expandIcon or row.Expand or row.expandCollapseButton or row.ExpandCollapseButton
-  if collapse then collapse:Hide() end
 end
 
 local function StyleNormal(row)
@@ -1171,7 +1161,9 @@ local function SkinTokenRow(i)
     local row = _G["TokenFrameContainerButton"..i]
     if not row then return end
 
-    SetRowHeaderStyle(row, i, row.isHeader, 0)
+    -- wantPlate=false: the server already draws the header plate (catPlate); we only
+    -- need the zebra exclusion here (header rows get no stripe).
+    SetRowHeaderStyle(row, i, row.isHeader, 0, false)
 
     if row.isHeader then
         StyleHeader(row)
