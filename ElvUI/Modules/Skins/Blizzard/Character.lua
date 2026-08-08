@@ -60,32 +60,54 @@ local function AddRowStripe(row, i, rightPad, isHeader)
 	end
 end
 
--- A title plate for category/header rows (the look the server already gives skill
--- headers), so titles read as headers instead of blending into the zebra. A flat
--- black fill is invisible on the dark window, so use an ElvUI-templated panel: its
--- border makes the plate read clearly. Used where the server doesn't already draw
--- one (reputation, currency).
+-- The exact title plate the server draws on skill headers (SkillFrame_EnsureHeaderPlate):
+-- a left cap + stretched middle + mirrored right cap from the commonbuttons atlas.
+-- Copied 1:1 so reputation/currency headers match the skills tab.
+local PLATE_TEX   = "Interface\\Buttons\\commonbuttons"
+local PLATE_LEFT  = { 0.916992, 0.955078, 0.145508, 0.282227 }
+local PLATE_RIGHT = { 0.955078, 0.916992, 0.145508, 0.282227 } -- mirrored
+local PLATE_MID   = { 0.40, 0.60, 0.145508, 0.282227 }
+local PLATE_H, PLATE_CAP = 24, 7
+
 local function EnsureBlackPlate(row)
 	if not row.__euiHdrPlate then
-		local plate = CreateFrame("Frame", nil, row)
-		if row.GetFrameLevel then
-			plate:SetFrameLevel(math_max((row:GetFrameLevel() or 1) - 1, 0))
-		end
-		if plate.SetTemplate then plate:SetTemplate("Transparent") end
-		plate:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -1)
-		plate:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 1)
-		row.__euiHdrPlate = plate
+		local left = row:CreateTexture(nil, "BACKGROUND")
+		left:SetTexture(PLATE_TEX)
+		left:SetTexCoord(unpack(PLATE_LEFT))
+		left:SetPoint("LEFT", row, "LEFT", 2, 0)
+		left:SetSize(PLATE_CAP, PLATE_H)
+
+		local right = row:CreateTexture(nil, "BACKGROUND")
+		right:SetTexture(PLATE_TEX)
+		right:SetTexCoord(unpack(PLATE_RIGHT))
+		right:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+		right:SetSize(PLATE_CAP, PLATE_H)
+
+		local body = row:CreateTexture(nil, "BACKGROUND")
+		body:SetTexture(PLATE_TEX)
+		body:SetTexCoord(unpack(PLATE_MID))
+		body:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
+		body:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT", 0, 0)
+
+		row.__euiHdrPlate = { left, body, right }
 	end
 	return row.__euiHdrPlate
 end
 
--- Header rows get the black plate and no zebra; data rows get the zebra.
+local function SetPlateShown(plate, show)
+	if not plate then return end
+	for _, t in ipairs(plate) do
+		if show then t:Show() else t:Hide() end
+	end
+end
+
+-- Header rows get the copied skills plate and no zebra; data rows get the zebra.
 local function SetRowHeaderStyle(row, i, isHeader, rightPad)
 	if not row then return end
 	if isHeader then
-		EnsureBlackPlate(row):Show()
+		SetPlateShown(EnsureBlackPlate(row), true)
 	elseif row.__euiHdrPlate then
-		row.__euiHdrPlate:Hide()
+		SetPlateShown(row.__euiHdrPlate, false)
 	end
 	AddRowStripe(row, i, rightPad, isHeader)
 end
