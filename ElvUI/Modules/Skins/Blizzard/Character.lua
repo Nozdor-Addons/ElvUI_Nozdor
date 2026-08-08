@@ -36,6 +36,23 @@ local function MakeBD(parent, w, h)
     return f
 end
 
+-- Zebra striping for list rows, matching the server's own statistics tables
+-- (Custom_RaidLogTop): a faint WHITE8X8 fill on every other row. Keyed by the row's
+-- fixed slot index (rows are recycled on scroll), so the shading stays put like a
+-- statistics list. Idempotent per row.
+local function AddRowStripe(row, i, rightPad)
+	if not row or not row.CreateTexture then return end
+	if (i % 2) ~= 0 or row.__euiStripe then return end
+	local stripe = row:CreateTexture(nil, "BACKGROUND")
+	stripe:SetDrawLayer("BACKGROUND", -2)
+	stripe:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+	stripe:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", rightPad or 0, 0)
+	stripe:SetTexture("Interface\\Buttons\\WHITE8X8")
+	stripe:SetVertexColor(1, 1, 1)
+	stripe:SetAlpha(0.05)
+	row.__euiStripe = stripe
+end
+
 -- NOZDOR: the redesigned PaperDollFrame decorates its inner panels and the model
 -- frame with art (InsetFrameTemplate _UI-Frame borders, PaperDollInfoPart panels,
 -- UI-Background-Marble, race-specific DressUpBackground behind the model), and
@@ -354,9 +371,14 @@ end
 				tab:HookScript("OnLeave", S.SetOriginalBackdrop)
 			end
 		end
+		-- The redesigned pet rotate buttons use a commonbuttons plate + a commonicons
+		-- arrow (their own Icon texture) and have no highlight texture, so
+		-- HandleRotateButton errors on GetHighlightTexture() and mangles them (the
+		-- left one lost its button, both slid). HandleButton nils the plate, keeps the
+		-- arrow icon and applies the ElvUI template without resizing.
 		local pl, pr = _G.PetModelFrameRotateLeftButton, _G.PetModelFrameRotateRightButton
-		if pl and S.HandleRotateButton then S:HandleRotateButton(pl) end
-		if pr and S.HandleRotateButton then S:HandleRotateButton(pr) end
+		if pl and S.HandleButton then S:HandleButton(pl) end
+		if pr and S.HandleButton then S:HandleButton(pr) end
 	end
 
 --	do
@@ -639,6 +661,8 @@ local function SkinReputationRow(i)
         name:SetPoint("LEFT", btn, "RIGHT", 4, 0)
     end
 
+    AddRowStripe(row, i)
+
     row.__EUI_skinned = true
 end
 
@@ -840,6 +864,7 @@ local function SkinSkills()
     local NUM = _G.SKILLS_TO_DISPLAY or 12
     for i = 1, NUM do
         SkinSkillRow(i)
+        AddRowStripe(_G["SkillTypeLabel"..i], i)
     end
 end
 
@@ -926,6 +951,8 @@ end
 local function SkinTokenRow(i)
     local row = _G["TokenFrameContainerButton"..i]
     if not row then return end
+
+    AddRowStripe(row, i)
 
     if row.isHeader then
         StyleHeader(row)
