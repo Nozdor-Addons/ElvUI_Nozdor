@@ -992,20 +992,10 @@ local function SkinSkills()
         S:HandleScrollBar(dSB)
     end
 
-    local detailBar = _G.SkillDetailStatusBar or _G.SkillRankFrame
-    local detailBorder = _G.SkillDetailStatusBarBorder
-    if detailBar then
-        if detailBar.StripTextures then detailBar:StripTextures(true) end
-        if detailBorder then detailBorder:Hide() end
-        if detailBar.SetStatusBarTexture and E and E.media and E.media.normTex then
-            detailBar:SetStatusBarTexture(E.media.normTex)
-        end
-        detailBar:SetHeight(12)
-        if not detailBar.backdrop then
-            detailBar:CreateBackdrop("Default", true)
-            detailBar.backdrop:SetFrameLevel(detailBar:GetFrameLevel() - 1)
-        end
-    end
+    -- The skill detail status bar is coloured and valued by the server
+    -- (SkillDetailFrame_SetStatusBar). Overriding its texture/height + adding an
+    -- ElvUI backdrop made it read as an empty box; leave it to the server, like the
+    -- list bars.
 
     -- The "All" button is a server-built tab (uiframetabs atlas on
     -- SkillFrameExpandButtonFrame). HandleCollapseExpandButton noops its texture
@@ -1190,7 +1180,14 @@ end
 local function SkinTokenPopup()
   local f=_G.TokenFramePopup; if not f then return end
   f:StripTextures(true)
-  if not f.__bd then local b=MakeBD(f); b:SetAllPoints(f); f.__bd=b end
+  -- The popup carries a stock UI-DialogBox <Backdrop> (a frame backdrop, which
+  -- StripTextures can't remove) -> it showed up white. Clear it and give it a dark
+  -- ElvUI backdrop, like the reputation detail panel.
+  if f.SetBackdrop then f:SetBackdrop(nil) end
+  if f.CreateBackdrop and not f.backdrop then
+    f:CreateBackdrop("Transparent")
+    if f.backdrop.SetBackdropColor then f.backdrop:SetBackdropColor(0, 0, 0, 0.55) end
+  end
   if _G.TokenFramePopupCloseButton and S and S.HandleCloseButton then S:HandleCloseButton(_G.TokenFramePopupCloseButton) end
   if S and S.HandleCheckBox then
     if _G.TokenFramePopupInactiveCheckBox then S:HandleCheckBox(_G.TokenFramePopupInactiveCheckBox) end
