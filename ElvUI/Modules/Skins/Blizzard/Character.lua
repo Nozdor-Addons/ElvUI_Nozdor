@@ -793,37 +793,33 @@ end
 C_Timer.After(0, ClearReputationBackground)
 
 local function SkinSkillRow(i)
-    local name   = _G["SkillName"..i]
-    local btn    = _G["SkillExpandButton"..i]
-    local rank   = _G["SkillRankFrame"..i]
+    -- A skill DATA line is the SkillRankFrame<i> status bar (headers are the
+    -- separate SkillTypeLabel<i>, already plated by the server). The old code keyed
+    -- off a non-existent SkillName<i> global and bailed, so the bar was never styled.
+    local bar    = _G["SkillRankFrame"..i]
+    if not bar or bar.__EUI_skinned then return end
+
     local border = _G["SkillRankFrame"..i.."Border"]
+    local fill   = _G["SkillRankFrame"..i.."FillBar"]
+    local bg     = _G["SkillRankFrame"..i.."Background"]
 
-    if not name or name.__EUI_skinned then return end
-
-    if btn then
-        if S and S.HandleCollapseExpandButton then
-            S:HandleCollapseExpandButton(btn, "+")
-        else
-            if btn.SetNormalTexture then btn:SetNormalTexture(nil) end
-            if btn.SetPushedTexture then btn:SetPushedTexture(nil) end
-            if btn.SetHighlightTexture then btn:SetHighlightTexture(nil) end
-        end
+    if border and border.Hide then border:Hide() end
+    if bar.StripTextures then bar:StripTextures(true) end
+    if fill and fill.SetAlpha then fill:SetAlpha(0) end
+    if bg and bg.SetAlpha then bg:SetAlpha(0) end
+    if bar.SetStatusBarTexture and E and E.media and E.media.normTex then
+        bar:SetStatusBarTexture(E.media.normTex)
+    end
+    bar:SetHeight(14)
+    if not bar.backdrop then
+        bar:CreateBackdrop("Default", true)
+        bar.backdrop:SetFrameLevel(bar:GetFrameLevel() - 1)
     end
 
-    if rank then
-        if rank.StripTextures then rank:StripTextures(true) end
-        if border then border:Hide() end
-        if rank.SetStatusBarTexture and E and E.media and E.media.normTex then
-            rank:SetStatusBarTexture(E.media.normTex)
-        end
-        rank:SetHeight(12)
-        if not rank.backdrop then
-            rank:CreateBackdrop("Default", true)
-            rank.backdrop:SetFrameLevel(rank:GetFrameLevel() - 1)
-        end
-    end
+    -- Zebra the data row (the bar spans the whole line; +6 covers the name inset).
+    AddRowStripe(bar, i, 6)
 
-    name.__EUI_skinned = true
+    bar.__EUI_skinned = true
 end
 
 local function SkinSkills()
@@ -884,7 +880,6 @@ local function SkinSkills()
     local NUM = _G.SKILLS_TO_DISPLAY or 12
     for i = 1, NUM do
         SkinSkillRow(i)
-        AddRowStripe(_G["SkillTypeLabel"..i], i)
     end
 end
 
