@@ -1133,7 +1133,17 @@ local function StyleNormal(row)
     icon:SetDesaturated(false)
     icon:SetVertexColor(1,1,1)
     icon:SetAlpha(1)
-    icon:SetTexCoord(.08,.92,.08,.92)
+    -- The server enlarges the ring emblems (honor/arena) to 20x20 with their own
+    -- crop, while every other currency icon is 15x15; that made the emblem's frame
+    -- bigger than the rest. Force a uniform 15x15 and crop the emblems to fill so
+    -- they match the other icons.
+    local tex = icon.GetTexture and icon:GetTexture()
+    if type(tex) == "string" and tex:lower():find("pvpcurrency", 1, true) then
+        icon:SetTexCoord(0.171875, 0.859375, 0.140625, 0.828125)
+    else
+        icon:SetTexCoord(.08, .92, .08, .92)
+    end
+    icon:SetSize(15, 15)
     icon:SetDrawLayer("ARTWORK", 1)
 
     if not icon.backdrop then
