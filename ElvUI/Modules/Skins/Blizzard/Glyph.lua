@@ -24,6 +24,20 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	GlyphFrame.backdrop:Point("BOTTOMRIGHT", -32, 76)
 	S:SetBackdropHitRect(GlyphFrame)
 
+	-- Base metal-frame cleanup on the shared PlayerTalentFrame: drop the metal
+	-- border + spec ring icon (reskin the close button) and hide the rock/shadow, so
+	-- the glyph view doesn't show the leftover ring/corner chrome. The glyph parchment
+	-- itself is kept below.
+	local function CleanTalentChrome()
+		if S.HandleMetalFrame and _G.PlayerTalentFrame then
+			S:HandleMetalFrame(_G.PlayerTalentFrame, _G.PlayerTalentFrame.backdrop)
+		end
+		if _G.PlayerTalentFrameBackground then _G.PlayerTalentFrameBackground:SetAlpha(0) end
+		if _G.PlayerTalentFrameTopTileStreaks then _G.PlayerTalentFrameTopTileStreaks:SetAlpha(0) end
+	end
+	CleanTalentChrome()
+	GlyphFrame:HookScript("OnShow", CleanTalentChrome)
+
 	local function MatchTalentFrameSize()
 		if PlayerTalentFrame then
 			local w, h = PlayerTalentFrame:GetSize()
