@@ -117,15 +117,15 @@ local function ApplyHeaderPlate(row, show)
 		left:Hide(); body:Hide(); right:Hide()
 		return
 	end
-	left:SetDrawLayer("BACKGROUND", -8)
+	left:SetDrawLayer("BORDER")
 	left:SetTexture(PLATE_TEX); left:SetTexCoord(unpack(PLATE_LEFT))
 	left:ClearAllPoints(); left:SetPoint("LEFT", row, "LEFT", 2, 0); left:SetSize(PLATE_CAP, PLATE_H); left:Show()
 
-	right:SetDrawLayer("BACKGROUND", -8)
+	right:SetDrawLayer("BORDER")
 	right:SetTexture(PLATE_TEX); right:SetTexCoord(unpack(PLATE_RIGHT))
 	right:ClearAllPoints(); right:SetPoint("RIGHT", row, "RIGHT", -2, 0); right:SetSize(PLATE_CAP, PLATE_H); right:Show()
 
-	body:SetDrawLayer("BACKGROUND", -8)
+	body:SetDrawLayer("BORDER")
 	body:SetTexture(PLATE_TEX); body:SetTexCoord(unpack(PLATE_MID))
 	body:ClearAllPoints()
 	body:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
