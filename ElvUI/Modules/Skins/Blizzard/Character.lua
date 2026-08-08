@@ -18,6 +18,17 @@ if _G.CloseButton2X_Apply and not _G.__ElvUI_CloseButton2XHooked then
 		if btn and S.HandleCloseButton then S:HandleCloseButton(btn) end
 	end)
 end
+-- The other half: windows decorated via MetalFrame2X_Decorate create their own
+-- redbutton2x CloseButton (not through CloseButton2X_Apply). Hook that too so every
+-- decorated window's close button becomes the ElvUI X.
+if _G.MetalFrame2X_Decorate and not _G.__ElvUI_MetalDecorateHooked then
+	_G.__ElvUI_MetalDecorateHooked = true
+	hooksecurefunc("MetalFrame2X_Decorate", function(frame)
+		if frame and frame.CloseButton and S.HandleCloseButton then
+			S:HandleCloseButton(frame.CloseButton)
+		end
+	end)
+end
 
 local function SafeHandleTab(tab)
 	if not tab then return end
@@ -812,28 +823,22 @@ local function SkinReputation()
         det:StripTextures(true)
         if det.backdrop then det.backdrop:StripTextures() end
         det:CreateBackdrop("Transparent")
+        -- Shrink the panel backdrop 1px in from the right and bottom.
+        if det.backdrop then
+            det.backdrop:ClearAllPoints()
+            det.backdrop:Point("TOPLEFT", det, "TOPLEFT", 0, 0)
+            det.backdrop:Point("BOTTOMRIGHT", det, "BOTTOMRIGHT", -1, 1)
+        end
 
-        -- The detail panel is decorated with a diamond-metal border (RightEdge /
-        -- LeftEdge / ... on uiframediamondmetal2x) when it opens, i.e. after this
-        -- one-time strip. Blank those metal edges on its OnShow, and drop the
-        -- CollectionsBackgroundTile for a backdrop a touch darker than usual.
+        -- The panel is redecorated when it opens (diamond-metal border on
+        -- uiframediamondmetal2x, a UI-DialogBox-Background fill), AFTER this one-time
+        -- strip — so on first open the old chrome showed and the background was too
+        -- tall. Strip the detail frame's own textures again on every OnShow so first
+        -- open matches the reopened state.
         if not det.__euiDetailHooked then
             det.__euiDetailHooked = true
             det:HookScript("OnShow", function(frame)
-                if frame.GetRegions then
-                    local i = 1
-                    while true do
-                        local r = select(i, frame:GetRegions())
-                        if not r then break end
-                        if r.GetObjectType and r:GetObjectType() == "Texture" then
-                            local tex = r.GetTexture and r:GetTexture()
-                            if type(tex) == "string" and tex:lower():find("diamondmetal", 1, true) then
-                                r:SetTexture(nil); r:SetAlpha(0)
-                            end
-                        end
-                        i = i + 1
-                    end
-                end
+                if frame.StripTextures then frame:StripTextures(true) end
             end)
         end
 
