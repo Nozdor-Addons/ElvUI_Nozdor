@@ -120,6 +120,28 @@ local function HideCharacterPortraitModel()
 	end
 end
 
+-- Pet tab: the shared CharacterFrameInset shows a UI-Background-Marble fill on the
+-- first pet open, and PetAttributesFrame carries a UI-Character-StatBackground
+-- plate; blank both to the flat ElvUI look. The rotate arrows also read too big.
+local function SkinPetFrame()
+	BlankDecorTextures(_G.CharacterFrameInset)
+
+	local attr = _G.PetAttributesFrame
+	if attr then
+		BlankDecorTextures(attr)
+		if attr.CreateBackdrop and not attr.backdrop then
+			attr:CreateBackdrop("Transparent")
+		end
+	end
+
+	for _, name in ipairs({ "PetModelFrameRotateLeftButton", "PetModelFrameRotateRightButton" }) do
+		local btn = _G[name]
+		if btn and S.HandleButton then S:HandleButton(btn) end
+		local icon = _G[name.."Icon"]
+		if icon and icon.SetSize then icon:SetSize(11, 11) end
+	end
+end
+
 local function LoadSkin()
 	if E.private.skins.blizzard.enable ~= true or E.private.skins.blizzard.character ~= true then return end
 
@@ -371,14 +393,12 @@ end
 				tab:HookScript("OnLeave", S.SetOriginalBackdrop)
 			end
 		end
-		-- The redesigned pet rotate buttons use a commonbuttons plate + a commonicons
-		-- arrow (their own Icon texture) and have no highlight texture, so
-		-- HandleRotateButton errors on GetHighlightTexture() and mangles them (the
-		-- left one lost its button, both slid). HandleButton nils the plate, keeps the
-		-- arrow icon and applies the ElvUI template without resizing.
-		local pl, pr = _G.PetModelFrameRotateLeftButton, _G.PetModelFrameRotateRightButton
-		if pl and S.HandleButton then S:HandleButton(pl) end
-		if pr and S.HandleButton then S:HandleButton(pr) end
+		-- Rotate buttons, the marble inset and the stat-background plate are handled
+		-- in SkinPetFrame; run it now and on every pet show (the marble is applied on
+		-- the first open, after this one-time pass). HandleButton (used inside) keeps
+		-- the arrow icon and avoids HandleRotateButton's nil-highlight crash.
+		_G.PetPaperDollFrame:HookScript("OnShow", SkinPetFrame)
+		SkinPetFrame()
 	end
 
 --	do
