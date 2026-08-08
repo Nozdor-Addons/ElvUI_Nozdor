@@ -58,11 +58,33 @@ local function BlankDecorTextures(frame)
 	end
 end
 
+-- The stat-category headers (ItemLevel / Stat1 / Stat2) use a PaperDollInfoPart1
+-- plate behind their label. Replace it with a flat ElvUI panel + hover highlight.
+local function StyleStatHeader(header)
+	if not header then return end
+	if header.Background then
+		header.Background:SetTexture(nil)
+		header.Background:Hide()
+	end
+	if header.CreateBackdrop and not header.backdrop then
+		header:CreateBackdrop("Transparent")
+		header.backdrop:Point("TOPLEFT", header, "TOPLEFT", 4, -4)
+		header.backdrop:Point("BOTTOMRIGHT", header, "BOTTOMRIGHT", -4, 4)
+		if header.HookScript and S.SetModifiedBackdrop then
+			header:HookScript("OnEnter", S.SetModifiedBackdrop)
+			header:HookScript("OnLeave", S.SetOriginalBackdrop)
+		end
+	end
+end
+
 local function CleanPaperDollDecor()
 	BlankDecorTextures(_G.PaperDollFrameNewPanel)
 	BlankDecorTextures(_G.PaperDollFrameEquipInset)
 	BlankDecorTextures(_G.PaperDollFrameInset)
 	BlankDecorTextures(_G.CharacterModelFrame)
+	StyleStatHeader(_G.ItemLevelHeader)
+	StyleStatHeader(_G.Stat1Header)
+	StyleStatHeader(_G.Stat2Header)
 end
 
 local function LoadSkin()
@@ -108,17 +130,18 @@ local function LoadSkin()
 			-- default 10px side insets leave big gaps between the backdrops. Hug the
 			-- button instead (the backdrop still tracks the tab's runtime width).
 			if tab and tab.backdrop then
-				tab.backdrop:Point("TOPLEFT", tab, "TOPLEFT", 2, -2)
+				-- Hug the wide NozdorFinder tab; backdrop top flush with the tab top
+				-- so the row sits right against the window edge (no gap, no overlap).
+				tab.backdrop:Point("TOPLEFT", tab, "TOPLEFT", 2, 0)
 				tab.backdrop:Point("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -2, 2)
 				tab:SetHitRectInsets(0, 0, 0, 0)
 			end
 		end
-		-- The window anchors the tab row at y=-30, but the NozdorFinder tabs are 34
-		-- tall, so the row overlapped the window edge by ~4px. Drop Tab1 (the row
-		-- chains off it) so it sits flush below the frame.
+		-- Anchor the tab row's TOP to the window's BOTTOM so it hangs flush below the
+		-- frame regardless of tab height (the row chains off Tab1).
 		if _G.CharacterFrameTab1 and _G.CharacterFrame then
 			_G.CharacterFrameTab1:ClearAllPoints()
-			_G.CharacterFrameTab1:Point("BOTTOMLEFT", _G.CharacterFrame, "BOTTOMLEFT", 10, -34)
+			_G.CharacterFrameTab1:Point("TOPLEFT", _G.CharacterFrame, "BOTTOMLEFT", 10, 0)
 		end
 	end
 

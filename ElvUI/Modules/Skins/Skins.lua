@@ -558,12 +558,15 @@ function S:HandleMetalFrame(frame, closeButtonPoint)
 			end
 		end
 		-- A spec/portrait icon may be drawn on the border frame itself.
-		if border.specRingIcon then border.specRingIcon:SetAlpha(0) end
+		if border.specRingIcon then border.specRingIcon:Hide() end
 	end
 
 	-- Ring portrait / spec icon can live on the window rather than the border.
-	if frame.ringPortrait then frame.ringPortrait:SetAlpha(0) end
-	if frame.specRingIcon then frame.specRingIcon:SetAlpha(0) end
+	-- Use Hide(): the window keeps calling SetPortraitTexture() on the ring portrait
+	-- (e.g. on UNIT_PORTRAIT_UPDATE), which would undo a plain SetAlpha(0); a hidden
+	-- region stays hidden.
+	if frame.ringPortrait then frame.ringPortrait:Hide() end
+	if frame.specRingIcon then frame.specRingIcon:Hide() end
 
 	-- Reskin the custom (redbutton2x) close button to the ElvUI "X".
 	if frame.CloseButton then
