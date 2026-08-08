@@ -46,8 +46,14 @@ end
 local function AddRowStripe(row, i, rightPad, isHeader)
 	if not row or not row.CreateTexture then return end
 	if (i % 2) == 0 and not row.__euiStripe then
-		local stripe = row:CreateTexture(nil, "BACKGROUND")
-		stripe:SetDrawLayer("BACKGROUND", -2)
+		-- On a child frame so row:StripTextures() (called by the row skinners) can't
+		-- wipe it, regardless of call order — it never recurses into child frames.
+		local holder = CreateFrame("Frame", nil, row)
+		holder:SetAllPoints(row)
+		if holder.SetFrameLevel and row.GetFrameLevel then
+			holder:SetFrameLevel(math_max((row:GetFrameLevel() or 1) - 1, 0))
+		end
+		local stripe = holder:CreateTexture(nil, "BACKGROUND")
 		stripe:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
 		stripe:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", rightPad or 0, 0)
 		stripe:SetTexture("Interface\\Buttons\\WHITE8X8")
