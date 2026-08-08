@@ -87,6 +87,22 @@ local function CleanPaperDollDecor()
 	StyleStatHeader(_G.Stat2Header)
 end
 
+-- The corner "portrait" is a live 3D PlayerModel (CharacterFramePortraitModel),
+-- not a texture, so texture stripping doesn't touch it. Hide it and keep it hidden
+-- against the portrait system re-showing it on UNIT_PORTRAIT_UPDATE.
+local function HideCharacterPortraitModel()
+	for _, name in ipairs({ "CharacterFramePortraitModel", "CharacterFramePortraitModelModel" }) do
+		local model = _G[name]
+		if model and model.Hide then
+			model:Hide()
+			if model.HookScript and not model.__elvHidden then
+				model.__elvHidden = true
+				model:HookScript("OnShow", model.Hide)
+			end
+		end
+	end
+end
+
 local function LoadSkin()
 	if E.private.skins.blizzard.enable ~= true or E.private.skins.blizzard.character ~= true then return end
 
@@ -119,6 +135,7 @@ local function LoadSkin()
 			if S.HandleMetalFrame then S:HandleMetalFrame(frame, frame.backdrop) end
 			if _G.CharacterFrameBg then _G.CharacterFrameBg:SetAlpha(0) end
 			if _G.CharacterFrameTopTileStreaks then _G.CharacterFrameTopTileStreaks:SetAlpha(0) end
+			HideCharacterPortraitModel()
 		end)
 	end
 
