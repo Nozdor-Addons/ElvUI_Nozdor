@@ -6,7 +6,6 @@ local ipairs = ipairs
 local unpack = unpack
 local math_max = math.max
 local floor = math.floor
-local strfind = string.find
 
 local function SafeHandleTab(tab)
 	if not tab then return end
@@ -38,36 +37,21 @@ local function MakeBD(parent, w, h)
 end
 
 -- NOZDOR: the redesigned PaperDollFrame builds its inner panels from
--- InsetFrameTemplate (metallic _UI-Frame borders) plus PaperDollInfoPart* panel
--- art, and re-applies that art after ElvUI's one-time strip has already run. Blank
--- the decorative borders/backgrounds on every PaperDoll show so the flat ElvUI
--- backdrop shows through. Surgical: only touches the inset-border regions and the
--- PaperDollInfoPart/_UI-Frame textures, never the stats text, model or item slots.
-local INSET_BORDER_KEYS = {
-	"InsetBorderTop", "InsetBorderBottom", "InsetBorderLeft", "InsetBorderRight",
-	"InsetBorderTopLeft", "InsetBorderTopRight", "InsetBorderBottomLeft", "InsetBorderBottomRight",
-}
-
+-- InsetFrameTemplate (metallic _UI-Frame borders) plus decorative panel art
+-- (PaperDollInfoPart, UI-Background-Marble, ...), and re-applies that art after
+-- ElvUI's one-time strip has already run. These panels are purely decorative --
+-- the stats text, model and item slots are separate child frames, not regions of
+-- the panel -- so blank ALL of the panel's own texture regions to let the flat
+-- ElvUI backdrop show, without whack-a-mole per atlas. FontStrings are left alone.
 local function CleanInsetPanel(frame)
-	if not frame then return end
-	for _, key in ipairs(INSET_BORDER_KEYS) do
-		local region = frame[key]
-		if region and region.SetTexture then
-			region:SetTexture(nil)
-			region:SetAlpha(0)
-		end
-	end
-	if not frame.GetRegions then return end
+	if not frame or not frame.GetRegions then return end
 	local i = 1
 	while true do
 		local r = select(i, frame:GetRegions())
 		if not r then break end
 		if r.GetObjectType and r:GetObjectType() == "Texture" then
-			local tex = r.GetTexture and r:GetTexture()
-			if tex and (strfind(tex, "PaperDollInfoPart", 1, true) or strfind(tex, "_UI-Frame", 1, true)) then
-				r:SetTexture(nil)
-				r:SetAlpha(0)
-			end
+			r:SetTexture(nil)
+			r:SetAlpha(0)
 		end
 		i = i + 1
 	end
