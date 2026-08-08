@@ -36,14 +36,15 @@ local function MakeBD(parent, w, h)
     return f
 end
 
--- NOZDOR: the redesigned PaperDollFrame builds its inner panels from
--- InsetFrameTemplate (metallic _UI-Frame borders) plus decorative panel art
--- (PaperDollInfoPart, UI-Background-Marble, ...), and re-applies that art after
--- ElvUI's one-time strip has already run. These panels are purely decorative --
--- the stats text, model and item slots are separate child frames, not regions of
--- the panel -- so blank ALL of the panel's own texture regions to let the flat
--- ElvUI backdrop show, without whack-a-mole per atlas. FontStrings are left alone.
-local function CleanInsetPanel(frame)
+-- NOZDOR: the redesigned PaperDollFrame decorates its inner panels and the model
+-- frame with art (InsetFrameTemplate _UI-Frame borders, PaperDollInfoPart panels,
+-- UI-Background-Marble, race-specific DressUpBackground behind the model), and
+-- re-applies it after ElvUI's one-time strip has already run. Each of these frames
+-- is purely a decorative container -- the stats text, the 3D model and the item
+-- slots are separate child frames/objects, not texture regions of it -- so blank
+-- ALL of the frame's own texture regions to let the flat ElvUI backdrop show,
+-- without whack-a-mole per atlas. FontStrings (and the model) are left untouched.
+local function BlankDecorTextures(frame)
 	if not frame or not frame.GetRegions then return end
 	local i = 1
 	while true do
@@ -58,9 +59,10 @@ local function CleanInsetPanel(frame)
 end
 
 local function CleanPaperDollDecor()
-	CleanInsetPanel(_G.PaperDollFrameNewPanel)
-	CleanInsetPanel(_G.PaperDollFrameEquipInset)
-	CleanInsetPanel(_G.PaperDollFrameInset)
+	BlankDecorTextures(_G.PaperDollFrameNewPanel)
+	BlankDecorTextures(_G.PaperDollFrameEquipInset)
+	BlankDecorTextures(_G.PaperDollFrameInset)
+	BlankDecorTextures(_G.CharacterModelFrame)
 end
 
 local function LoadSkin()
@@ -110,6 +112,13 @@ local function LoadSkin()
 				tab.backdrop:Point("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -2, 2)
 				tab:SetHitRectInsets(0, 0, 0, 0)
 			end
+		end
+		-- The window anchors the tab row at y=-30, but the NozdorFinder tabs are 34
+		-- tall, so the row overlapped the window edge by ~4px. Drop Tab1 (the row
+		-- chains off it) so it sits flush below the frame.
+		if _G.CharacterFrameTab1 and _G.CharacterFrame then
+			_G.CharacterFrameTab1:ClearAllPoints()
+			_G.CharacterFrameTab1:Point("BOTTOMLEFT", _G.CharacterFrame, "BOTTOMLEFT", 10, -34)
 		end
 	end
 
@@ -216,6 +225,7 @@ end
 		-- relayout (and once now).
 		_G.PaperDollFrame:HookScript("OnShow", CleanPaperDollDecor)
 		if _G.PaperDollFrame_UpdateStats then hooksecurefunc("PaperDollFrame_UpdateStats", CleanPaperDollDecor) end
+		if _G.CharacterModelFrame then _G.CharacterModelFrame:HookScript("OnShow", CleanPaperDollDecor) end
 		CleanPaperDollDecor()
 
 		local slots = {
