@@ -950,10 +950,25 @@ local function SkinSkills()
             if allTab[k] and allTab[k].SetAlpha then allTab[k]:SetAlpha(0) end
         end
     end
+    -- Keep the server's yellow +/- texture hidden and show our own text sign;
+    -- collapsed=true (all collapsed) => "+", expanded => "-".
+    local function UpdateAllBtnSign(btn, collapsed)
+        if not btn or not btn.CreateFontString then return end
+        if btn.SetNormalTexture then btn:SetNormalTexture("") end
+        if btn.SetPushedTexture then btn:SetPushedTexture("") end
+        local nt = btn.GetNormalTexture and btn:GetNormalTexture()
+        if nt then nt:SetTexture(nil) end
+        if not btn.__euiSign then
+            local fs = btn:CreateFontString(nil, "OVERLAY")
+            if fs.FontTemplate then fs:FontTemplate(nil, 18) end
+            fs:SetPoint("RIGHT", btn, "RIGHT", -8, 0)
+            btn.__euiSign = fs
+        end
+        btn.__euiSign:SetText(collapsed and "+" or "-")
+    end
+
     local allBtn = _G.SkillFrameCollapseAllButton
     if allBtn then
-        if allBtn.SetNormalTexture then allBtn:SetNormalTexture("") end
-        if allBtn.SetPushedTexture then allBtn:SetPushedTexture("") end
         if allBtn.SetHighlightTexture then allBtn:SetHighlightTexture("") end
         if allBtn.CreateBackdrop and not allBtn.backdrop then
             allBtn:CreateBackdrop("Default", true)
@@ -962,19 +977,13 @@ local function SkinSkills()
                 allBtn:HookScript("OnLeave", S.SetOriginalBackdrop)
             end
         end
+        -- Set the sign now (StyleAllButton fires only on toggle, so without this the
+        -- +/- appeared only after the first click). isExpanded == 1 => expanded.
+        UpdateAllBtnSign(allBtn, allBtn.isExpanded ~= 1)
     end
     if _G.SkillFrame_StyleAllButton and not S.__euiAllBtnHooked then
         S.__euiAllBtnHooked = true
-        hooksecurefunc("SkillFrame_StyleAllButton", function(btn, collapsed)
-            if not btn or not btn.CreateFontString then return end
-            if not btn.__euiSign then
-                local fs = btn:CreateFontString(nil, "OVERLAY")
-                if fs.FontTemplate then fs:FontTemplate(nil, 18) end
-                fs:SetPoint("RIGHT", btn, "RIGHT", -8, 0)
-                btn.__euiSign = fs
-            end
-            btn.__euiSign:SetText(collapsed and "+" or "-")
-        end)
+        hooksecurefunc("SkillFrame_StyleAllButton", UpdateAllBtnSign)
     end
     if _G.SkillFrameFilterCheckButton and S and S.HandleCheckBox then
         S:HandleCheckBox(_G.SkillFrameFilterCheckButton)
