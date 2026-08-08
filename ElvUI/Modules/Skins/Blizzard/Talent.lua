@@ -113,6 +113,46 @@ do
 		S:HandleButton(PlayerTalentFramePointsBarResetButton)
 	end
 
+	-- Server control bar (grid/multi-tree view) uses its own Learn/Reset buttons
+	-- (PlayerTalentFrameControlBar*Button), not the old PlayerTalentFrame*Button
+	-- ones. Skin them so they match the rest of the ElvUI window.
+	if PlayerTalentFrameControlBarLearnButton then
+		S:HandleButton(PlayerTalentFrameControlBarLearnButton)
+	end
+	if PlayerTalentFrameControlBarResetButton then
+		S:HandleButton(PlayerTalentFrameControlBarResetButton)
+	end
+
+	-- The talent trees are drawn as three grid columns, each wrapped by the server
+	-- in an InsetFrameTemplate (marble _UI-Frame border) with a rock/marble
+	-- background. Strip that chrome and give each column a strong dark ElvUI
+	-- backdrop so the trees read as flat dark panels instead of framed marble.
+	local GRID_BG_SUFFIX = {
+		"Background", "BackgroundTopLeft", "BackgroundTopRight",
+		"BackgroundBottomLeft", "BackgroundBottomRight",
+	}
+	local function SkinGridColumns()
+		for c = 1, 3 do
+			local inset = _G["PlayerTalentFrameGridColumn"..c.."Inset"]
+			if inset and not inset.__euiSkinned then
+				inset.__euiSkinned = true
+				inset:StripTextures()
+				inset:CreateBackdrop("Transparent")
+				inset.backdrop:SetBackdropColor(0, 0, 0, 0.6)
+			end
+			for _, sfx in ipairs(GRID_BG_SUFFIX) do
+				local bg = _G["PlayerTalentFrameGridColumn"..c..sfx]
+				if bg then bg:SetTexture(nil); bg:SetAlpha(0) end
+			end
+		end
+	end
+	if _G.TalentFrame_ApplyColumnInsets then
+		hooksecurefunc("TalentFrame_ApplyColumnInsets", function(tf)
+			if tf == PlayerTalentFrame then SkinGridColumns() end
+		end)
+	end
+	SkinGridColumns()
+
 	--PlayerTalentFramePreviewBarFiller:StripTextures()
 
 	PlayerTalentFrameScrollFrame:StripTextures()
@@ -181,5 +221,5 @@ do
 	-- Anchor the bottom tab row's TOP to the window's BOTTOM so it hangs flush below
 	-- the frame (the old y=46 dragged the whole row up into the content).
 	PlayerTalentFrameTab1:ClearAllPoints()
-	PlayerTalentFrameTab1:Point("TOPLEFT", PlayerTalentFrame, "BOTTOMLEFT", 11, 1)
+	PlayerTalentFrameTab1:Point("TOPLEFT", PlayerTalentFrame, "BOTTOMLEFT", 11, 2)
 end)

@@ -28,12 +28,32 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	-- border + spec ring icon (reskin the close button) and hide the rock/shadow, so
 	-- the glyph view doesn't show the leftover ring/corner chrome. The glyph parchment
 	-- itself is kept below.
+	-- The glyph view has its own full-window rock base (PlayerTalentFrameGlyphRock,
+	-- stored as PlayerTalentFrame.glyphRockBase). Blank it so the flat ElvUI
+	-- backdrop shows instead of the rock tile bleeding through.
+	local function HideGlyphRock()
+		local base = _G.PlayerTalentFrame and _G.PlayerTalentFrame.glyphRockBase
+		if base then
+			if base.GetRegions then
+				local j = 1
+				while true do
+					local r = select(j, base:GetRegions())
+					if not r then break end
+					if r.SetAlpha then r:SetAlpha(0) end
+					j = j + 1
+				end
+			end
+			base:Hide()
+		end
+	end
+
 	local function CleanTalentChrome()
 		if S.HandleMetalFrame and _G.PlayerTalentFrame then
 			S:HandleMetalFrame(_G.PlayerTalentFrame, _G.PlayerTalentFrame.backdrop)
 		end
 		if _G.PlayerTalentFrameBackground then _G.PlayerTalentFrameBackground:SetAlpha(0) end
 		if _G.PlayerTalentFrameTopTileStreaks then _G.PlayerTalentFrameTopTileStreaks:SetAlpha(0) end
+		HideGlyphRock()
 	end
 	CleanTalentChrome()
 	GlyphFrame:HookScript("OnShow", CleanTalentChrome)
@@ -51,12 +71,17 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	MatchTalentFrameSize()
 
 	-- ==== TUNING ====
-	-- Size of the parchment area (and the layout radius) relative to Blizzard's default
-	local paperScale = 1.5   -- 0.90..0.98 are usually nice
+	-- Size of the parchment area (and the layout radius) relative to Blizzard's default.
+	-- The server redesigned the glyph view: the parchment area is the LEFT inset
+	-- (PlayerTalentFrame.contentInset, width 436) and the glyph list lives in the
+	-- right inset. Centre the parchment on that left area (not on the whole wide
+	-- window) and keep the scale small enough to fit inside it, otherwise the
+	-- parchment looks zoomed and the glyph rings spill across the window.
+	local paperScale = 1.15
 	-- Size of the glyph buttons relative to default
-	local slotScale  = 1.07   -- keep close to paperScale
+	local slotScale  = 1.0    -- keep close to paperScale
 	-- Vertical nudge for the whole parchment block (helps center it visually)
-	local yOffset    = -9
+	local yOffset    = 0
 	-- =================
 
 	-- Base size used by Blizzard/ElvUI skin in 3.3.5
@@ -68,9 +93,19 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	if not holder then
 		holder = CreateFrame("Frame", "GlyphFrameElvUIHolder", GlyphFrame)
 	end
-	holder:ClearAllPoints()
-	holder:SetPoint("CENTER", GlyphFrame, "CENTER", 0, yOffset)
-	holder:SetSize(baseW * paperScale, baseH * paperScale)
+	-- Anchor to the server's left glyph area when present, so the parchment sits
+	-- in the glyph column rather than centred over the whole (wide) glyph window.
+	local function AnchorHolder()
+		local glyphArea = _G.PlayerTalentFrame and _G.PlayerTalentFrame.contentInset
+		holder:ClearAllPoints()
+		if glyphArea then
+			holder:SetPoint("CENTER", glyphArea, "CENTER", 0, yOffset)
+		else
+			holder:SetPoint("CENTER", GlyphFrame, "CENTER", 0, yOffset)
+		end
+		holder:SetSize(baseW * paperScale, baseH * paperScale)
+	end
+	AnchorHolder()
 	holder:SetFrameLevel(GlyphFrame:GetFrameLevel() + 1)
 
 	-- Parchment texture
@@ -103,6 +138,8 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	}
 
 	local function ApplyGlyphLayout()
+		AnchorHolder()
+		HideGlyphRock()
 		local glyphFrameLevel = holder:GetFrameLevel() + 5
 
 		for i = 1, 6 do
