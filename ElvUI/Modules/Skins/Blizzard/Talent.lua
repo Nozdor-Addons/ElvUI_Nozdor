@@ -24,15 +24,30 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_TalentUI", function()
 	if _G.PlayerTalentFrameBackground then _G.PlayerTalentFrameBackground:SetAlpha(0) end
 	if _G.PlayerTalentFrameTopTileStreaks then _G.PlayerTalentFrameTopTileStreaks:SetAlpha(0) end
 	-- The inner content inset (InsetFrameTemplate: _UI-Frame borders + marble bg) is
-	-- purely decorative; blank its own textures like the paperdoll panels.
+	-- re-textured on show, so blank its own textures and give it a darker backdrop on
+	-- every show.
+	local function CleanTalentInset(inset)
+		if not inset then return end
+		if inset.GetRegions then
+			local j = 1
+			while true do
+				local r = select(j, inset:GetRegions())
+				if not r then break end
+				if r.GetObjectType and r:GetObjectType() == "Texture" then r:SetTexture(nil); r:SetAlpha(0) end
+				j = j + 1
+			end
+		end
+		if inset.CreateBackdrop and not inset.backdrop then
+			inset:CreateBackdrop("Transparent")
+			if inset.backdrop.SetBackdropColor then inset.backdrop:SetBackdropColor(0, 0, 0, 0.5) end
+		end
+	end
 	local talentInset = _G.PlayerTalentFrameContentInset
-	if talentInset and talentInset.GetRegions then
-		local j = 1
-		while true do
-			local r = select(j, talentInset:GetRegions())
-			if not r then break end
-			if r.GetObjectType and r:GetObjectType() == "Texture" then r:SetTexture(nil); r:SetAlpha(0) end
-			j = j + 1
+	if talentInset then
+		CleanTalentInset(talentInset)
+		if not talentInset.__euiInsetHooked then
+			talentInset.__euiInsetHooked = true
+			talentInset:HookScript("OnShow", CleanTalentInset)
 		end
 	end
 
@@ -167,5 +182,5 @@ do
 	-- Anchor the bottom tab row's TOP to the window's BOTTOM so it hangs flush below
 	-- the frame (the old y=46 dragged the whole row up into the content).
 	PlayerTalentFrameTab1:ClearAllPoints()
-	PlayerTalentFrameTab1:Point("TOPLEFT", PlayerTalentFrame, "BOTTOMLEFT", 11, 0)
+	PlayerTalentFrameTab1:Point("TOPLEFT", PlayerTalentFrame, "BOTTOMLEFT", 11, 1)
 end)
