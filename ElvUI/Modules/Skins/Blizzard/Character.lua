@@ -98,39 +98,29 @@ local PLATE_RIGHT = { 0.955078, 0.916992, 0.145508, 0.282227 } -- mirrored
 local PLATE_MID   = { 0.40, 0.60, 0.145508, 0.282227 }
 local PLATE_H, PLATE_CAP = 24, 7
 
--- Apply (or hide) the header plate. The three textures live directly on the row on
--- the BACKGROUND layer, so they always sit behind the row's ARTWORK/OVERLAY label
--- and +/- sign — a child-frame plate drew ON TOP of the text on rows sitting at
--- frame level 0 (currency). The texture/coords are re-set on every call so
--- SkinReputationRow's row:StripTextures(true) can't leave the plate blanked.
-local function ApplyHeaderPlate(row, show)
-	if not row.CreateTexture then return end
+-- The header plate lives on its own child frame so SkinReputationRow's
+-- row:StripTextures(true) can't wipe it. Returns the holder frame so callers can
+-- raise a row's label above it where needed (currency rows sit at frame level 0).
+local function EnsureBlackPlate(row)
 	if not row.__euiHdrPlate then
-		row.__euiHdrPlate = {
-			row:CreateTexture(nil, "BACKGROUND"),
-			row:CreateTexture(nil, "BACKGROUND"),
-			row:CreateTexture(nil, "BACKGROUND"),
-		}
+		local holder = CreateFrame("Frame", nil, row)
+		holder:SetAllPoints(row)
+		if holder.SetFrameLevel and row.GetFrameLevel then
+			holder:SetFrameLevel(math_max((row:GetFrameLevel() or 1) - 1, 0))
+		end
+		local left = holder:CreateTexture(nil, "ARTWORK")
+		left:SetTexture(PLATE_TEX); left:SetTexCoord(unpack(PLATE_LEFT))
+		left:SetPoint("LEFT", holder, "LEFT", 2, 0); left:SetSize(PLATE_CAP, PLATE_H)
+		local right = holder:CreateTexture(nil, "ARTWORK")
+		right:SetTexture(PLATE_TEX); right:SetTexCoord(unpack(PLATE_RIGHT))
+		right:SetPoint("RIGHT", holder, "RIGHT", -2, 0); right:SetSize(PLATE_CAP, PLATE_H)
+		local body = holder:CreateTexture(nil, "ARTWORK")
+		body:SetTexture(PLATE_TEX); body:SetTexCoord(unpack(PLATE_MID))
+		body:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
+		body:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT", 0, 0)
+		row.__euiHdrPlate = holder
 	end
-	local left, body, right = row.__euiHdrPlate[1], row.__euiHdrPlate[2], row.__euiHdrPlate[3]
-	if not show then
-		left:Hide(); body:Hide(); right:Hide()
-		return
-	end
-	left:SetDrawLayer("BORDER")
-	left:SetTexture(PLATE_TEX); left:SetTexCoord(unpack(PLATE_LEFT))
-	left:ClearAllPoints(); left:SetPoint("LEFT", row, "LEFT", 2, 0); left:SetSize(PLATE_CAP, PLATE_H); left:Show()
-
-	right:SetDrawLayer("BORDER")
-	right:SetTexture(PLATE_TEX); right:SetTexCoord(unpack(PLATE_RIGHT))
-	right:ClearAllPoints(); right:SetPoint("RIGHT", row, "RIGHT", -2, 0); right:SetSize(PLATE_CAP, PLATE_H); right:Show()
-
-	body:SetDrawLayer("BORDER")
-	body:SetTexture(PLATE_TEX); body:SetTexCoord(unpack(PLATE_MID))
-	body:ClearAllPoints()
-	body:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
-	body:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT", 0, 0)
-	body:Show()
+	return row.__euiHdrPlate
 end
 
 -- ElvUI-style +/- for the reputation sub-category dropdown button (rowType 3): hide
@@ -159,7 +149,11 @@ end
 local function SetRowHeaderStyle(row, i, isHeader, rightPad, wantPlate)
 	if not row then return end
 	if wantPlate == nil then wantPlate = isHeader end
-	ApplyHeaderPlate(row, wantPlate and true or false)
+	if wantPlate then
+		EnsureBlackPlate(row):Show()
+	elseif row.__euiHdrPlate then
+		row.__euiHdrPlate:Hide()
+	end
 	AddRowStripe(row, i, rightPad, isHeader)
 end
 
@@ -1111,9 +1105,12 @@ local function StyleHeader(row)
   if row.__hdr then row.__hdr:Hide() end
   local fs=FindHeaderFS(row)
   if fs then
-    fs:SetParent(row)
+    -- Currency rows sit at frame level 0, so the plate holder can't go behind them;
+    -- put the label ON the holder instead, above the plate, so it isn't covered.
+    local host = row.__euiHdrPlate or row
+    fs:SetParent(host)
     fs:ClearAllPoints()
-    fs:SetPoint("CENTER",row,"CENTER",-8,0)
+    fs:SetPoint("CENTER",host,"CENTER",-8,0)
     fs:SetDrawLayer("OVERLAY",7)
     fs:SetAlpha(1)
     fs:Show()
