@@ -71,43 +71,48 @@ local PLATE_H, PLATE_CAP = 24, 7
 
 local function EnsureBlackPlate(row)
 	if not row.__euiHdrPlate then
-		local left = row:CreateTexture(nil, "BACKGROUND")
+		-- Put the plate on a child frame, not on the row itself: SkinReputationRow
+		-- calls row:StripTextures(true), which would wipe textures created directly
+		-- on the row (but never reaches a nested child frame).
+		local holder = CreateFrame("Frame", nil, row)
+		holder:SetAllPoints(row)
+		if holder.SetFrameLevel and row.GetFrameLevel then
+			holder:SetFrameLevel(math_max((row:GetFrameLevel() or 1) - 1, 0))
+		end
+
+		local left = holder:CreateTexture(nil, "BACKGROUND")
 		left:SetTexture(PLATE_TEX)
 		left:SetTexCoord(unpack(PLATE_LEFT))
-		left:SetPoint("LEFT", row, "LEFT", 2, 0)
+		left:SetPoint("LEFT", holder, "LEFT", 2, 0)
 		left:SetSize(PLATE_CAP, PLATE_H)
 
-		local right = row:CreateTexture(nil, "BACKGROUND")
+		local right = holder:CreateTexture(nil, "BACKGROUND")
 		right:SetTexture(PLATE_TEX)
 		right:SetTexCoord(unpack(PLATE_RIGHT))
-		right:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+		right:SetPoint("RIGHT", holder, "RIGHT", -2, 0)
 		right:SetSize(PLATE_CAP, PLATE_H)
 
-		local body = row:CreateTexture(nil, "BACKGROUND")
+		local body = holder:CreateTexture(nil, "BACKGROUND")
 		body:SetTexture(PLATE_TEX)
 		body:SetTexCoord(unpack(PLATE_MID))
 		body:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
 		body:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT", 0, 0)
 
-		row.__euiHdrPlate = { left, body, right }
+		row.__euiHdrPlate = holder
 	end
 	return row.__euiHdrPlate
 end
 
-local function SetPlateShown(plate, show)
-	if not plate then return end
-	for _, t in ipairs(plate) do
-		if show then t:Show() else t:Hide() end
-	end
-end
-
--- Header rows get the copied skills plate and no zebra; data rows get the zebra.
-local function SetRowHeaderStyle(row, i, isHeader, rightPad)
+-- Header rows are excluded from the zebra; they get the copied skills plate UNLESS
+-- they already carry a +/- expand button (wantPlate=false), so the plate doesn't
+-- collide with the button. wantPlate defaults to isHeader.
+local function SetRowHeaderStyle(row, i, isHeader, rightPad, wantPlate)
 	if not row then return end
-	if isHeader then
-		SetPlateShown(EnsureBlackPlate(row), true)
+	if wantPlate == nil then wantPlate = isHeader end
+	if wantPlate then
+		EnsureBlackPlate(row):Show()
 	elseif row.__euiHdrPlate then
-		SetPlateShown(row.__euiHdrPlate, false)
+		row.__euiHdrPlate:Hide()
 	end
 	AddRowStripe(row, i, rightPad, isHeader)
 end
@@ -806,8 +811,22 @@ if _G.ReputationFrame_SetRowType then
         if not factionRow or not factionRow.GetName then return end
         local i = tonumber((factionRow:GetName() or ""):match("ReputationBar(%d+)$"))
         if not i then return end
-        SetRowHeaderStyle(factionRow, i, (rowType == 2 or rowType == 3), 0)
+        -- rowType 2 = top category (text sign, wants a plate); rowType 3 = sub-category
+        -- (already has a +/- dropdown button, so no plate). Both are excluded from zebra.
+        SetRowHeaderStyle(factionRow, i, (rowType == 2 or rowType == 3), 0, rowType == 2)
     end)
+end
+-- The per-row hook only fires while ReputationFrame_Update runs; force one on show
+-- so the plates appear immediately instead of only after the first scroll.
+if _G.CharacterFrame and _G.CharacterFrame.HookScript then
+    _G.CharacterFrame:HookScript("OnShow", function()
+        if _G.ReputationFrame and _G.ReputationFrame:IsShown() and _G.ReputationFrame_Update then
+            _G.ReputationFrame_Update()
+        end
+    end)
+end
+if _G.ReputationFrame and _G.ReputationFrame.HookScript and _G.ReputationFrame_Update then
+    _G.ReputationFrame:HookScript("OnShow", _G.ReputationFrame_Update)
 end
 
 local function KillTextures(frame)
