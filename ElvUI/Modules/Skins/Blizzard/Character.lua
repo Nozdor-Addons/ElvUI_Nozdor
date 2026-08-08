@@ -1138,6 +1138,8 @@ local function StyleNormal(row)
 
     if not icon.backdrop then
         local b = CreateFrame("Frame", nil, row, BACKDROP_TPL)
+        b:SetPoint("TOPLEFT",  icon, -1,  1)
+        b:SetPoint("BOTTOMRIGHT", icon,  1, -1)
         b:SetFrameLevel((row:GetFrameLevel() or 2) - 1)
         b:SetBackdrop({ edgeFile = "Interface/Buttons/WHITE8x8", edgeSize = 1 })
         b:SetBackdropBorderColor(0,0,0,1)
@@ -1145,14 +1147,6 @@ local function StyleNormal(row)
     else
         icon.backdrop:SetFrameLevel((row:GetFrameLevel() or 2) - 1)
     end
-    -- Fit the frame to the visible emblem. The pvpcurrency (arena/honor) art has a
-    -- lot of transparent padding, so keep the icon the same size as every other
-    -- currency and shrink its FRAME inward to the emblem instead of enlarging it.
-    local tex = icon.GetTexture and icon:GetTexture()
-    local inset = (type(tex) == "string" and tex:lower():find("pvpcurrency", 1, true)) and 3 or -1
-    icon.backdrop:ClearAllPoints()
-    icon.backdrop:SetPoint("TOPLEFT", icon, inset, -inset)
-    icon.backdrop:SetPoint("BOTTOMRIGHT", icon, -inset, inset)
 end
   local watch=row.Watch or row.watch or row.Check or row.WatchCheck
   if watch and S and S.HandleCheckBox then S:HandleCheckBox(watch) end
