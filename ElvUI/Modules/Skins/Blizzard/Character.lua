@@ -145,7 +145,7 @@ local function SkinPetFrame()
 		local btn = _G[name]
 		if btn and S.HandleButton then S:HandleButton(btn) end
 		local icon = _G[name.."Icon"]
-		if icon and icon.SetSize then icon:SetSize(11, 11) end
+		if icon and icon.SetSize then icon:SetSize(13, 13) end
 	end
 end
 
@@ -688,7 +688,9 @@ local function SkinReputationRow(i)
         name:SetPoint("LEFT", btn, "RIGHT", 4, 0)
     end
 
-    AddRowStripe(row, i, 0, row.catPlateBody and row.catPlateBody.IsShown and row.catPlateBody:IsShown())
+    -- Reputation category titles are already rendered distinctly (gold) by the
+    -- server's category plate, so we simply zebra every even row here.
+    AddRowStripe(row, i)
 
     row.__EUI_skinned = true
 end
@@ -750,22 +752,6 @@ if _G.CharacterFrame_ShowSubFrame then
 end
 
 C_Timer.After(0, SkinReputation)
-
--- Reputation rows are recycled between faction categories (headers) and factions
--- (data) as you scroll, so the zebra must follow. ReputationFrame_SetRowType runs
--- per row on every update and shows/hides the server's category plate; refresh the
--- stripe right after so header rows drop the stripe and keep their plate.
-local function RefreshReputationStripe(factionRow)
-    if not factionRow or not factionRow.GetName then return end
-    local name = factionRow:GetName()
-    local i = name and tonumber(name:match("ReputationBar(%d+)$"))
-    if not i then return end
-    local isHeader = factionRow.catPlateBody and factionRow.catPlateBody.IsShown and factionRow.catPlateBody:IsShown()
-    AddRowStripe(factionRow, i, 0, isHeader)
-end
-if _G.ReputationFrame_SetRowType then
-    hooksecurefunc("ReputationFrame_SetRowType", RefreshReputationStripe)
-end
 
 local function KillTextures(frame)
     if not frame then return end
