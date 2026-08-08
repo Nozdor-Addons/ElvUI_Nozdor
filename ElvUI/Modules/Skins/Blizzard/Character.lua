@@ -7,6 +7,18 @@ local unpack = unpack
 local math_max = math.max
 local floor = math.floor
 
+-- Mass close-button replacement. The server restyles close buttons to its
+-- redbutton2x look via the global CloseButton2X_Apply, which runs after our
+-- per-window skinning and so overrode the ElvUI "X" (e.g. the reputation detail
+-- panel). Hook it once: every button styled by it is re-skinned to the ElvUI close
+-- button automatically, wherever it appears — no per-button handling needed.
+if _G.CloseButton2X_Apply and not _G.__ElvUI_CloseButton2XHooked then
+	_G.__ElvUI_CloseButton2XHooked = true
+	hooksecurefunc("CloseButton2X_Apply", function(btn)
+		if btn and S.HandleCloseButton then S:HandleCloseButton(btn) end
+	end)
+end
+
 local function SafeHandleTab(tab)
 	if not tab then return end
 	if tab.HighlightLeft and tab.HighlightLeft.StripTextures then tab.HighlightLeft:StripTextures() end
@@ -800,6 +812,19 @@ local function SkinReputation()
         det:StripTextures(true)
         if det.backdrop then det.backdrop:StripTextures() end
         det:CreateBackdrop("Transparent")
+
+        -- Text area: drop the server's CollectionsBackgroundTile and give it a
+        -- backdrop a touch darker than the standard window background.
+        local tc = _G.ReputationDetailFrameTextContainer
+        if tc then
+            if tc.BackgroundTile then tc.BackgroundTile:SetTexture(nil); tc.BackgroundTile:Hide() end
+            if tc.StripTextures then tc:StripTextures(true) end
+            if tc.CreateBackdrop and not tc.backdrop then
+                tc:CreateBackdrop("Transparent")
+                if tc.backdrop.SetBackdropColor then tc.backdrop:SetBackdropColor(0, 0, 0, 0.55) end
+                if tc.backdrop.SetFrameLevel then tc.backdrop:SetFrameLevel(tc:GetFrameLevel()) end
+            end
+        end
 
         if _G.ReputationDetailCloseButton and S and S.HandleCloseButton then
             S:HandleCloseButton(_G.ReputationDetailCloseButton)
