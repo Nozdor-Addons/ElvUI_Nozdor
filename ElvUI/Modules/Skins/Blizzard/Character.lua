@@ -43,7 +43,7 @@ end
 -- server's distinct category plate, like the achievement-statistics window. The
 -- stripe is created lazily on even rows and toggled each call, so it can be turned
 -- off when a recycled slot becomes a header on scroll.
-local function AddRowStripe(row, i, rightPad, isHeader)
+local function AddRowStripe(row, i, rightPad, isHeader, leftPad)
 	if not row or not row.CreateTexture then return end
 	if (i % 2) == 0 and not row.__euiStripe then
 		-- On a child frame so row:StripTextures() (called by the row skinners) can't
@@ -54,7 +54,7 @@ local function AddRowStripe(row, i, rightPad, isHeader)
 			holder:SetFrameLevel(math_max((row:GetFrameLevel() or 1) - 1, 0))
 		end
 		local stripe = holder:CreateTexture(nil, "BACKGROUND")
-		stripe:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+		stripe:SetPoint("TOPLEFT", row, "TOPLEFT", leftPad or 0, 0)
 		stripe:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", rightPad or 0, 0)
 		stripe:SetTexture("Interface\\Buttons\\WHITE8X8")
 		stripe:SetVertexColor(1, 1, 1)
@@ -884,33 +884,17 @@ end
 C_Timer.After(0, ClearReputationBackground)
 
 local function SkinSkillRow(i)
-    -- A skill DATA line is the SkillRankFrame<i> status bar (headers are the
-    -- separate SkillTypeLabel<i>, already plated by the server). The old code keyed
-    -- off a non-existent SkillName<i> global and bailed, so the bar was never styled.
-    local bar    = _G["SkillRankFrame"..i]
-    if not bar or bar.__EUI_skinned then return end
+    -- A skill DATA line is the SkillRankFrame<i> status bar. The server ALREADY
+    -- styles it like reputation (SkillFrame_StyleBar: narrow bar on the right, name
+    -- on the left, its own 3-slice border + row hover). Fighting it (StripTextures /
+    -- SetHeight / backdrop) killed that border and pushed rows into the header above,
+    -- so leave the bar alone and only add the full-row zebra. The stripe spans from
+    -- the name on the left (-309) to just past the bar (+2), matching the server's
+    -- row hover; the bar is hidden on header slots, so the zebra follows.
+    local bar = _G["SkillRankFrame"..i]
+    if not bar then return end
 
-    local border = _G["SkillRankFrame"..i.."Border"]
-    local fill   = _G["SkillRankFrame"..i.."FillBar"]
-    local bg     = _G["SkillRankFrame"..i.."Background"]
-
-    if border and border.Hide then border:Hide() end
-    if bar.StripTextures then bar:StripTextures(true) end
-    if fill and fill.SetAlpha then fill:SetAlpha(0) end
-    if bg and bg.SetAlpha then bg:SetAlpha(0) end
-    if bar.SetStatusBarTexture and E and E.media and E.media.normTex then
-        bar:SetStatusBarTexture(E.media.normTex)
-    end
-    bar:SetHeight(14)
-    if not bar.backdrop then
-        bar:CreateBackdrop("Default", true)
-        bar.backdrop:SetFrameLevel(bar:GetFrameLevel() - 1)
-    end
-
-    -- Zebra the data row (the bar spans the whole line; +6 covers the name inset).
-    AddRowStripe(bar, i, 6)
-
-    bar.__EUI_skinned = true
+    AddRowStripe(bar, i, 2, false, -309)
 end
 
 local function SkinSkills()
@@ -955,14 +939,42 @@ local function SkinSkills()
         end
     end
 
-    if _G.SkillFrameCollapseAllButton then
-        if S and S.HandleCollapseExpandButton then
-            S:HandleCollapseExpandButton(_G.SkillFrameCollapseAllButton, "+")
-        else
-            _G.SkillFrameCollapseAllButton:SetNormalTexture(nil)
-            _G.SkillFrameCollapseAllButton:SetPushedTexture(nil)
-            _G.SkillFrameCollapseAllButton:SetHighlightTexture(nil)
+    -- The "All" button is a server-built tab (uiframetabs atlas on
+    -- SkillFrameExpandButtonFrame). HandleCollapseExpandButton noops its texture
+    -- setters and left a broken +/- square, and the server tab didn't match ElvUI.
+    -- Hide the server atlas, give the button a flat ElvUI backdrop + hover, and drive
+    -- a +/- sign from the server's own SkillFrame_StyleAllButton(btn, collapsed).
+    local allTab = _G.SkillFrameExpandButtonFrame
+    if allTab then
+        for _, k in ipairs({ "capL", "capR", "body" }) do
+            if allTab[k] and allTab[k].SetAlpha then allTab[k]:SetAlpha(0) end
         end
+    end
+    local allBtn = _G.SkillFrameCollapseAllButton
+    if allBtn then
+        if allBtn.SetNormalTexture then allBtn:SetNormalTexture("") end
+        if allBtn.SetPushedTexture then allBtn:SetPushedTexture("") end
+        if allBtn.SetHighlightTexture then allBtn:SetHighlightTexture("") end
+        if allBtn.CreateBackdrop and not allBtn.backdrop then
+            allBtn:CreateBackdrop("Default", true)
+            if allBtn.HookScript then
+                allBtn:HookScript("OnEnter", S.SetModifiedBackdrop)
+                allBtn:HookScript("OnLeave", S.SetOriginalBackdrop)
+            end
+        end
+    end
+    if _G.SkillFrame_StyleAllButton and not S.__euiAllBtnHooked then
+        S.__euiAllBtnHooked = true
+        hooksecurefunc("SkillFrame_StyleAllButton", function(btn, collapsed)
+            if not btn or not btn.CreateFontString then return end
+            if not btn.__euiSign then
+                local fs = btn:CreateFontString(nil, "OVERLAY")
+                if fs.FontTemplate then fs:FontTemplate(nil, 18) end
+                fs:SetPoint("RIGHT", btn, "RIGHT", -8, 0)
+                btn.__euiSign = fs
+            end
+            btn.__euiSign:SetText(collapsed and "+" or "-")
+        end)
     end
     if _G.SkillFrameFilterCheckButton and S and S.HandleCheckBox then
         S:HandleCheckBox(_G.SkillFrameFilterCheckButton)
