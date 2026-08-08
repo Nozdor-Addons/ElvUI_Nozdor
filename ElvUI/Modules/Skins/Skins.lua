@@ -511,6 +511,15 @@ local handleCloseButtonOnLeave = function(btn) if btn.Texture then btn.Texture:S
 
 function S:HandleCloseButton(f, point)
 	if not f then return end
+
+	-- Idempotent: once our "X" exists, don't StripTextures again — that would wipe
+	-- our own f.Texture (it's a region of f), which is what made close buttons vanish
+	-- when this ran more than once (mass hook / OnShow re-skin).
+	if f.Texture then
+		if point then f:Point("TOPRIGHT", point, "TOPRIGHT", 2, 3) end
+		return
+	end
+
 	f:StripTextures()
 
 	if f:GetNormalTexture() then f:SetNormalTexture("") f.SetNormalTexture = E.noop end

@@ -813,6 +813,30 @@ local function SkinReputation()
         if det.backdrop then det.backdrop:StripTextures() end
         det:CreateBackdrop("Transparent")
 
+        -- The detail panel is decorated with a diamond-metal border (RightEdge /
+        -- LeftEdge / ... on uiframediamondmetal2x) when it opens, i.e. after this
+        -- one-time strip. Blank those metal edges on its OnShow, and drop the
+        -- CollectionsBackgroundTile for a backdrop a touch darker than usual.
+        if not det.__euiDetailHooked then
+            det.__euiDetailHooked = true
+            det:HookScript("OnShow", function(frame)
+                if frame.GetRegions then
+                    local i = 1
+                    while true do
+                        local r = select(i, frame:GetRegions())
+                        if not r then break end
+                        if r.GetObjectType and r:GetObjectType() == "Texture" then
+                            local tex = r.GetTexture and r:GetTexture()
+                            if type(tex) == "string" and tex:lower():find("diamondmetal", 1, true) then
+                                r:SetTexture(nil); r:SetAlpha(0)
+                            end
+                        end
+                        i = i + 1
+                    end
+                end
+            end)
+        end
+
         -- Text area: drop the server's CollectionsBackgroundTile and give it a
         -- backdrop a touch darker than the standard window background.
         local tc = _G.ReputationDetailFrameTextContainer
