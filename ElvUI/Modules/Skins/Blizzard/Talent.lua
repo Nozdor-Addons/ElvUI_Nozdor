@@ -24,8 +24,10 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_TalentUI", function()
 	if _G.PlayerTalentFrameBackground then _G.PlayerTalentFrameBackground:SetAlpha(0) end
 	if _G.PlayerTalentFrameTopTileStreaks then _G.PlayerTalentFrameTopTileStreaks:SetAlpha(0) end
 	-- The inner content inset (InsetFrameTemplate: _UI-Frame borders + marble bg) is
-	-- re-textured on show, so blank its own textures and give it a darker backdrop on
-	-- every show.
+	-- re-textured on show, so blank its own textures every show. Do NOT give it a
+	-- backdrop: the glyph parchment and rune circle sit on frames BELOW this inset,
+	-- so a backdrop here would draw on top and darken/cover them. The window's own
+	-- flat backdrop already darkens the talent content area.
 	local function CleanTalentInset(inset)
 		if not inset then return end
 		if inset.GetRegions then
@@ -37,10 +39,7 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_TalentUI", function()
 				j = j + 1
 			end
 		end
-		if inset.CreateBackdrop and not inset.backdrop then
-			inset:CreateBackdrop("Transparent")
-			if inset.backdrop.SetBackdropColor then inset.backdrop:SetBackdropColor(0, 0, 0, 0.5) end
-		end
+		if inset.backdrop then inset.backdrop:Hide() end
 	end
 	local talentInset = _G.PlayerTalentFrameContentInset
 	if talentInset then
