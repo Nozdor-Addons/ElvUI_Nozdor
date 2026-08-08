@@ -109,6 +109,26 @@ local function EnsureBlackPlate(row)
 	return row.__euiHdrPlate
 end
 
+-- ElvUI-style +/- for the reputation sub-category dropdown button (rowType 3): hide
+-- the server's red dropdown texture and show a plain +/- glyph, like the collapse
+-- buttons in the quest window. Re-applied each SetRowType (the server re-textures it
+-- on every update), collapsed => "+", expanded => "-".
+local function StyleRepExpandButton(btn, collapsed)
+	if not btn then return end
+	if btn.SetNormalTexture then btn:SetNormalTexture("") end
+	if btn.SetPushedTexture then btn:SetPushedTexture("") end
+	if btn.SetHighlightTexture then btn:SetHighlightTexture("") end
+	local nt = btn.GetNormalTexture and btn:GetNormalTexture()
+	if nt then nt:SetTexture(nil) end
+	if not btn.__euiSign and btn.CreateFontString then
+		local fs = btn:CreateFontString(nil, "OVERLAY")
+		if fs.FontTemplate then fs:FontTemplate(nil, 16) end
+		fs:SetPoint("CENTER", btn, "CENTER", 0, 0)
+		btn.__euiSign = fs
+	end
+	if btn.__euiSign then btn.__euiSign:SetText(collapsed and "+" or "-") end
+end
+
 -- Header rows are excluded from the zebra; they get the copied skills plate UNLESS
 -- they already carry a +/- expand button (wantPlate=false), so the plate doesn't
 -- collide with the button. wantPlate defaults to isHeader.
@@ -820,6 +840,9 @@ if _G.ReputationFrame_SetRowType then
         -- rowType 2 = top category (text sign, wants a plate); rowType 3 = sub-category
         -- (already has a +/- dropdown button, so no plate). Both are excluded from zebra.
         SetRowHeaderStyle(factionRow, i, (rowType == 2 or rowType == 3), 0, rowType == 2)
+        if rowType == 3 then
+            StyleRepExpandButton(_G[factionRow:GetName().."ExpandOrCollapseButton"], factionRow.isCollapsed)
+        end
     end)
 end
 -- The per-row hook only fires while ReputationFrame_Update runs; force one on show
@@ -961,10 +984,22 @@ local function SkinSkills()
         if not btn.__euiSign then
             local fs = btn:CreateFontString(nil, "OVERLAY")
             if fs.FontTemplate then fs:FontTemplate(nil, 18) end
-            fs:SetPoint("RIGHT", btn, "RIGHT", -8, 0)
             btn.__euiSign = fs
         end
         btn.__euiSign:SetText(collapsed and "+" or "-")
+        -- The server centres the "All" label at +9,-3, which left the label and the
+        -- sign lopsided in the tab. Group them centred: label a touch left of centre,
+        -- sign right after it.
+        local label = btn.GetFontString and btn:GetFontString()
+        if label then
+            label:ClearAllPoints()
+            label:SetPoint("CENTER", btn, "CENTER", -6, 0)
+            btn.__euiSign:ClearAllPoints()
+            btn.__euiSign:SetPoint("LEFT", label, "RIGHT", 4, 0)
+        else
+            btn.__euiSign:ClearAllPoints()
+            btn.__euiSign:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        end
     end
 
     local allBtn = _G.SkillFrameCollapseAllButton
@@ -1071,8 +1106,21 @@ local function FixTokenIcon(icon)
     icon.SetVertexColor = function(self, _,_,_,a) return self:_SetVertexColor(1,1,1,a) end
     icon:_SetDesaturated(false)
     icon:_SetVertexColor(1,1,1, icon:GetAlpha() or 1)
-    icon:SetTexCoord(.08,.92,.08,.92)
     icon.__patched = true
+end
+
+-- The pvpcurrency emblem art (arena/honor) is drawn small inside a lot of empty
+-- canvas, so the standard .08 crop still leaves the icon frame around blank space.
+-- Crop those tighter to the visible emblem; keep the normal crop for other icons.
+-- Applied per row on every update because the rows are recycled across scroll.
+local function FitTokenIconCrop(icon)
+    if not icon or not icon.GetTexture then return end
+    local tex = icon:GetTexture()
+    if type(tex) == "string" and tex:lower():find("pvpcurrency", 1, true) then
+        icon:SetTexCoord(0.18, 0.82, 0.18, 0.82)
+    else
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    end
 end
 
 local function SkinTokenRow(i)
@@ -1088,6 +1136,7 @@ local function SkinTokenRow(i)
         local ic = row.icon or row.Icon
         if ic then
             FixTokenIcon(ic)
+            FitTokenIconCrop(ic)
             if not ic.backdrop then
                 local b = MakeBD(row)
                 b:SetPoint("TOPLEFT", ic, -1, 1)
