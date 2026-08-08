@@ -57,6 +57,18 @@ do
 		-- numTalentGroups, numPetTalentGroups
 		-- force = true
 		local function UpdateTalentFrameOffset(numTalentGroups, numPetTalentGroups, force)
+			-- The rune view (third tab) is pinned to 512 wide by the server so the
+			-- rune circle stays round; the dual-spec width offset would stretch the
+			-- window (and squash the circle into an oval), so never add it there.
+			local runeHost = PlayerTalentFrame.RuneHost
+			if runeHost and runeHost:IsShown() then
+				if force or PlayerTalentFrame.ElvUI_OffsetActive then
+					S:SetUIPanelWindowInfo(PlayerTalentFrame, "width")
+					PlayerTalentFrame.ElvUI_OffsetActive = false
+				end
+				return
+			end
+
 			if not numTalentGroups or not numPetTalentGroups then
 				numTalentGroups = GetNumTalentGroups(false, false)
 				numPetTalentGroups = GetNumTalentGroups(false, true)
@@ -85,6 +97,24 @@ do
 			hooksecurefunc("PlayerTalentFrame_UpdateSpecs", function(_, numTalentGroups, _, numPetTalentGroups)
 				UpdateTalentFrameOffset(numTalentGroups, numPetTalentGroups)
 			end)
+
+			-- Re-run the offset logic when entering/leaving the rune view so the
+			-- window snaps back to the server's 512-wide (round-circle) size, and
+			-- hide the RuneHost's own old close button — it lives alongside the new
+			-- metal close button (it's a child frame, so the server's region-hide
+			-- loop never reaches it).
+			if _G.PlayerTalentFrame_ShowRuneFrame then
+				hooksecurefunc("PlayerTalentFrame_ShowRuneFrame", function()
+					UpdateTalentFrameOffset(nil, nil, true)
+					local rh = PlayerTalentFrame.RuneHost
+					if rh and rh.CloseButton then rh.CloseButton:Hide() end
+				end)
+			end
+			if _G.PlayerTalentFrame_HideRuneFrame then
+				hooksecurefunc("PlayerTalentFrame_HideRuneFrame", function()
+					UpdateTalentFrameOffset(nil, nil, true)
+				end)
+			end
 		end
 
 		UpdateTalentFrameOffset(nil, nil, true)
@@ -152,6 +182,39 @@ do
 		end)
 	end
 	SkinGridColumns()
+
+	-- Rune selection popup (opens on rune-slot click). It's a server
+	-- ButtonFrameTemplate decorated with MetalFrame2X, but only the close button
+	-- was styled; the rock background, recessed marble inset, action buttons and
+	-- scrollbar are left stock. Skin them to match the rest of the ElvUI window.
+	-- The panel (UlduarRuneSelectionPanel) is created lazily on first rune click,
+	-- so skin it right after the (global) click handler builds it.
+	local function SkinRunePopup()
+		local panel = _G.UlduarRuneSelectionPanel
+		if not panel or panel.__euiSkinned then return end
+		panel.__euiSkinned = true
+
+		panel:CreateBackdrop("Transparent")
+		panel.backdrop:Point("TOPLEFT", 2, -2)
+		panel.backdrop:Point("BOTTOMRIGHT", -2, 2)
+
+		-- Metal border + close button -> ElvUI.
+		if S.HandleMetalFrame then S:HandleMetalFrame(panel, panel.backdrop) end
+
+		-- Rock background + recessed marble inset -> flat backdrop.
+		if panel.Bg then panel.Bg:SetTexture(nil); panel.Bg:SetAlpha(0) end
+		if panel.Inset then
+			panel.Inset:StripTextures()
+			if panel.Inset.Bgs then panel.Inset.Bgs:SetTexture(nil); panel.Inset.Bgs:SetAlpha(0) end
+		end
+
+		if _G.UlduarRuneActivateButton then S:HandleButton(_G.UlduarRuneActivateButton) end
+		if _G.UlduarRuneRemoveAllButton then S:HandleButton(_G.UlduarRuneRemoveAllButton) end
+		if _G.UlduarRuneScrollFrameScrollBar then S:HandleScrollBar(_G.UlduarRuneScrollFrameScrollBar) end
+	end
+	if _G.UlduarSecretsFrame_BrightRunes_OnClick then
+		hooksecurefunc("UlduarSecretsFrame_BrightRunes_OnClick", SkinRunePopup)
+	end
 
 	--PlayerTalentFramePreviewBarFiller:StripTextures()
 
