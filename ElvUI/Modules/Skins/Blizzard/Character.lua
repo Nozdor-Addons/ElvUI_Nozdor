@@ -60,6 +60,32 @@ local function AddRowStripe(row, i, rightPad, isHeader)
 	end
 end
 
+-- A flat black title plate for category/header rows (the look the server already
+-- gives skill headers), so titles read as headers instead of blending into the
+-- zebra. Used where the server doesn't already draw one (reputation, currency).
+local function EnsureBlackPlate(row)
+	if not row.__euiHdrPlate then
+		local t = row:CreateTexture(nil, "BACKGROUND", nil, -1)
+		t:SetTexture("Interface\\Buttons\\WHITE8X8")
+		t:SetVertexColor(0, 0, 0, 0.55)
+		t:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -1)
+		t:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 1)
+		row.__euiHdrPlate = t
+	end
+	return row.__euiHdrPlate
+end
+
+-- Header rows get the black plate and no zebra; data rows get the zebra.
+local function SetRowHeaderStyle(row, i, isHeader, rightPad)
+	if not row then return end
+	if isHeader then
+		EnsureBlackPlate(row):Show()
+	elseif row.__euiHdrPlate then
+		row.__euiHdrPlate:Hide()
+	end
+	AddRowStripe(row, i, rightPad, isHeader)
+end
+
 -- NOZDOR: the redesigned PaperDollFrame decorates its inner panels and the model
 -- frame with art (InsetFrameTemplate _UI-Frame borders, PaperDollInfoPart panels,
 -- UI-Background-Marble, race-specific DressUpBackground behind the model), and
@@ -671,26 +697,17 @@ local function SkinReputationRow(i)
         sb:SetHeight(14)
     end
 
-    if btn and S and S.HandleCollapseExpandButton then
-        S:HandleCollapseExpandButton(btn, "+")
-    elseif btn then
-        if btn.SetNormalTexture then btn:SetNormalTexture(nil) end
-        if btn.SetPushedTexture then btn:SetPushedTexture(nil) end
-        if btn.SetHighlightTexture then btn:SetHighlightTexture(nil) end
-    end
+    -- The server manages the +/- expand button per row type (text sign for
+    -- categories, a dropdown button for sub-categories), so ElvUI must NOT re-skin
+    -- it — HandleCollapseExpandButton noops the texture setters and breaks the
+    -- server's dynamic +/-. Likewise the server positions the faction title itself.
 
     if warCB and S and S.HandleCheckBox then
         S:HandleCheckBox(warCB)
     end
 
-    if name and btn then
-        name:ClearAllPoints()
-        name:SetPoint("LEFT", btn, "RIGHT", 4, 0)
-    end
-
-    -- Reputation category titles are already rendered distinctly (gold) by the
-    -- server's category plate, so we simply zebra every even row here.
-    AddRowStripe(row, i)
+    -- Zebra + black title plates are applied by the ReputationFrame_SetRowType hook
+    -- (below), which knows the row type reliably and follows rows across scroll.
 
     row.__EUI_skinned = true
 end
@@ -752,6 +769,20 @@ if _G.CharacterFrame_ShowSubFrame then
 end
 
 C_Timer.After(0, SkinReputation)
+
+-- Reputation rows are recycled between categories and factions as you scroll.
+-- ReputationFrame_SetRowType runs per row on every update with a reliable rowType
+-- number (0/1 = faction/child data, 2/3 = category/sub-category headers); refresh
+-- the black title plate + zebra right after so headers get the plate (no zebra) and
+-- data rows get the zebra, following recycled rows across scroll.
+if _G.ReputationFrame_SetRowType then
+    hooksecurefunc("ReputationFrame_SetRowType", function(factionRow, rowType)
+        if not factionRow or not factionRow.GetName then return end
+        local i = tonumber((factionRow:GetName() or ""):match("ReputationBar(%d+)$"))
+        if not i then return end
+        SetRowHeaderStyle(factionRow, i, (rowType == 2 or rowType == 3), 0)
+    end)
+end
 
 local function KillTextures(frame)
     if not frame then return end
@@ -976,7 +1007,7 @@ local function SkinTokenRow(i)
     local row = _G["TokenFrameContainerButton"..i]
     if not row then return end
 
-    AddRowStripe(row, i, 0, row.isHeader)
+    SetRowHeaderStyle(row, i, row.isHeader, 0)
 
     if row.isHeader then
         StyleHeader(row)
