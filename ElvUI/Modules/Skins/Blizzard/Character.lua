@@ -60,17 +60,21 @@ local function AddRowStripe(row, i, rightPad, isHeader)
 	end
 end
 
--- A flat black title plate for category/header rows (the look the server already
--- gives skill headers), so titles read as headers instead of blending into the
--- zebra. Used where the server doesn't already draw one (reputation, currency).
+-- A title plate for category/header rows (the look the server already gives skill
+-- headers), so titles read as headers instead of blending into the zebra. A flat
+-- black fill is invisible on the dark window, so use an ElvUI-templated panel: its
+-- border makes the plate read clearly. Used where the server doesn't already draw
+-- one (reputation, currency).
 local function EnsureBlackPlate(row)
 	if not row.__euiHdrPlate then
-		local t = row:CreateTexture(nil, "BACKGROUND", nil, -1)
-		t:SetTexture("Interface\\Buttons\\WHITE8X8")
-		t:SetVertexColor(0, 0, 0, 0.55)
-		t:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -1)
-		t:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 1)
-		row.__euiHdrPlate = t
+		local plate = CreateFrame("Frame", nil, row)
+		if row.GetFrameLevel then
+			plate:SetFrameLevel(math_max((row:GetFrameLevel() or 1) - 1, 0))
+		end
+		if plate.SetTemplate then plate:SetTemplate("Transparent") end
+		plate:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -1)
+		plate:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 1)
+		row.__euiHdrPlate = plate
 	end
 	return row.__euiHdrPlate
 end
