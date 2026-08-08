@@ -56,13 +56,33 @@ local function LoadSkin()
         bd:SetFrameLevel(math_max((cf:GetFrameLevel() or 1) - 2, 0))
     end
 
-	if S.HandlePortraitFrame and _G.CharacterFrame then
-		S:HandlePortraitFrame(_G.CharacterFrame)
+	-- NOZDOR: CharacterFrame is re-skinned with a runtime "MetalFrame2X" chrome on
+	-- its first OnShow (UITemplate2X loads after CharacterFrame), so the metal
+	-- border, portrait ring and custom close button don't exist yet at this point.
+	-- Neutralize them on show, and hide the server's rock window background so the
+	-- flat ElvUI backdrop (already anchored to the whole frame) shows through. The
+	-- window's own OnShow hook, which builds the chrome, is registered earlier and
+	-- therefore always runs before this one.
+	if _G.CharacterFrame then
+		_G.CharacterFrame:HookScript("OnShow", function(frame)
+			if S.HandleMetalFrame then S:HandleMetalFrame(frame, frame.backdrop) end
+			if _G.CharacterFrameBg then _G.CharacterFrameBg:SetAlpha(0) end
+			if _G.CharacterFrameTopTileStreaks then _G.CharacterFrameTopTileStreaks:SetAlpha(0) end
+		end)
 	end
 
 	if _G.CHARACTERFRAME_SUBFRAMES then
 		for i = 1, #_G.CHARACTERFRAME_SUBFRAMES do
-			SafeHandleTab(_G["CharacterFrameTab"..i])
+			local tab = _G["CharacterFrameTab"..i]
+			SafeHandleTab(tab)
+			-- The new NozdorFinder tabs are much wider than a stock tab, so ElvUI's
+			-- default 10px side insets leave big gaps between the backdrops. Hug the
+			-- button instead (the backdrop still tracks the tab's runtime width).
+			if tab and tab.backdrop then
+				tab.backdrop:Point("TOPLEFT", tab, "TOPLEFT", 2, -2)
+				tab.backdrop:Point("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -2, 2)
+				tab:SetHitRectInsets(0, 0, 0, 0)
+			end
 		end
 	end
 

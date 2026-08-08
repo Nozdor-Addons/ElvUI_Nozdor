@@ -531,6 +531,46 @@ function S:HandleCloseButton(f, point)
 	end
 end
 
+-- NOZDOR: the server no longer uses the stock Blizzard window chrome. Its custom
+-- windows are decorated at runtime by MetalFrame2X_Decorate/MetalFrame2X_Rebuild,
+-- which move all decoration into a CHILD frame (frame.MetalBorder) plus a ring
+-- portrait texture and a redbutton2x close button (frame.CloseButton). Because
+-- StripTextures() only touches a frame's OWN regions (never nested child frames),
+-- none of ElvUI's normal stripping reaches this art. HandleMetalFrame neutralizes
+-- it so the flat ElvUI backdrop shows through. Safe to call repeatedly (idempotent)
+-- and only does anything once the window has actually been decorated.
+local metalBorderRegions = {
+	"CornerTopLeft", "CornerTopRight", "CornerBottomLeft", "CornerBottomRight",
+	"BorderTop", "BorderBottom", "BorderLeft", "BorderRight",
+}
+
+function S:HandleMetalFrame(frame, closeButtonPoint)
+	if not frame then return end
+
+	local border = frame.MetalBorder
+	if border then
+		-- Blank the metal corners/edges but KEEP TitleText (ElvUI keeps window titles).
+		for _, key in ipairs(metalBorderRegions) do
+			local region = border[key]
+			if region and region.SetTexture then
+				region:SetTexture()
+				region:SetAlpha(0)
+			end
+		end
+		-- A spec/portrait icon may be drawn on the border frame itself.
+		if border.specRingIcon then border.specRingIcon:SetAlpha(0) end
+	end
+
+	-- Ring portrait / spec icon can live on the window rather than the border.
+	if frame.ringPortrait then frame.ringPortrait:SetAlpha(0) end
+	if frame.specRingIcon then frame.specRingIcon:SetAlpha(0) end
+
+	-- Reskin the custom (redbutton2x) close button to the ElvUI "X".
+	if frame.CloseButton then
+		S:HandleCloseButton(frame.CloseButton, closeButtonPoint)
+	end
+end
+
 local sliderOnDisable = function(self) self:GetThumbTexture():SetVertexColor(0.6, 0.6, 0.6, 0.8) end
 local sliderOnEnable = function(self) self:GetThumbTexture():SetVertexColor(1, 0.82, 0, 0.8) end
 
