@@ -11,10 +11,30 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_TalentUI", function()
 
 	PlayerTalentFrame:StripTextures(true)
 	PlayerTalentFrame:CreateBackdrop("Transparent")
-	PlayerTalentFrame.backdrop:Point("TOPLEFT", 11, -12)
-	PlayerTalentFrame.backdrop:Point("BOTTOMRIGHT", -32, 76)
+	PlayerTalentFrame.backdrop:Point("TOPLEFT", 2, -2)
+	PlayerTalentFrame.backdrop:Point("BOTTOMRIGHT", -2, 2)
 
 	S:SetBackdropHitRect(PlayerTalentFrame)
+
+	-- Base metal-frame adaptation (as on the Character window): drop the metal
+	-- border + spec ring icon, reskin the new close button, and hide the server's
+	-- rock background + top shadow so the flat ElvUI backdrop shows. The frame is
+	-- decorated in its OnLoad, so the chrome already exists at this callback.
+	if S.HandleMetalFrame then S:HandleMetalFrame(PlayerTalentFrame, PlayerTalentFrame.backdrop) end
+	if _G.PlayerTalentFrameBackground then _G.PlayerTalentFrameBackground:SetAlpha(0) end
+	if _G.PlayerTalentFrameTopTileStreaks then _G.PlayerTalentFrameTopTileStreaks:SetAlpha(0) end
+	-- The inner content inset (InsetFrameTemplate: _UI-Frame borders + marble bg) is
+	-- purely decorative; blank its own textures like the paperdoll panels.
+	local talentInset = _G.PlayerTalentFrameContentInset
+	if talentInset and talentInset.GetRegions then
+		local j = 1
+		while true do
+			local r = select(j, talentInset:GetRegions())
+			if not r then break end
+			if r.GetObjectType and r:GetObjectType() == "Texture" then r:SetTexture(nil); r:SetAlpha(0) end
+			j = j + 1
+		end
+	end
 
 
 do
@@ -104,7 +124,13 @@ do
 	end
 
 	for i = 1, 5 do
-		S:HandleTab(_G["PlayerTalentFrameTab"..i])
+		local tab = _G["PlayerTalentFrameTab"..i]
+		S:HandleTab(tab)
+		if tab and tab.backdrop then
+			tab.backdrop:Point("TOPLEFT", tab, "TOPLEFT", 2, 0)
+			tab.backdrop:Point("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -2, 2)
+			tab:SetHitRectInsets(0, 0, 0, 0)
+		end
 	end
 
 	for i = 1, MAX_TALENT_TABS do
@@ -131,9 +157,15 @@ do
 	PlayerTalentFrameResetButton:Point("RIGHT", -4, 1)
 	PlayerTalentFrameLearnButton:Point("RIGHT", PlayerTalentFrameResetButton, "LEFT", -3, 0)
 
-	PlayerSpecTab1:Point("TOPLEFT", PlayerTalentFrame, "TOPRIGHT", -33, -65)
+	-- Side spec tabs stick out on the right edge (like a spellbook skill tab). The
+	-- old -33 x offset was tuned to the stock frame border and pulled them INTO the
+	-- new metal window ("recessed"); anchor them just past the right edge instead.
+	PlayerSpecTab1:Point("TOPLEFT", PlayerTalentFrame, "TOPRIGHT", -2, -45)
 	PlayerSpecTab1.ClearAllPoints = E.noop
 	PlayerSpecTab1.SetPoint = E.noop
 
-	PlayerTalentFrameTab1:Point("BOTTOMLEFT", 11, 46)
+	-- Anchor the bottom tab row's TOP to the window's BOTTOM so it hangs flush below
+	-- the frame (the old y=46 dragged the whole row up into the content).
+	PlayerTalentFrameTab1:ClearAllPoints()
+	PlayerTalentFrameTab1:Point("TOPLEFT", PlayerTalentFrame, "BOTTOMLEFT", 11, 0)
 end)
