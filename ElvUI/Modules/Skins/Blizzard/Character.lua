@@ -1138,8 +1138,6 @@ local function StyleNormal(row)
 
     if not icon.backdrop then
         local b = CreateFrame("Frame", nil, row, BACKDROP_TPL)
-        b:SetPoint("TOPLEFT",  icon, -1,  1)
-        b:SetPoint("BOTTOMRIGHT", icon,  1, -1)
         b:SetFrameLevel((row:GetFrameLevel() or 2) - 1)
         b:SetBackdrop({ edgeFile = "Interface/Buttons/WHITE8x8", edgeSize = 1 })
         b:SetBackdropBorderColor(0,0,0,1)
@@ -1147,6 +1145,14 @@ local function StyleNormal(row)
     else
         icon.backdrop:SetFrameLevel((row:GetFrameLevel() or 2) - 1)
     end
+    -- Fit the frame to the visible emblem. The pvpcurrency (arena/honor) art has a
+    -- lot of transparent padding, so keep the icon the same size as every other
+    -- currency and shrink its FRAME inward to the emblem instead of enlarging it.
+    local tex = icon.GetTexture and icon:GetTexture()
+    local inset = (type(tex) == "string" and tex:lower():find("pvpcurrency", 1, true)) and 3 or -1
+    icon.backdrop:ClearAllPoints()
+    icon.backdrop:SetPoint("TOPLEFT", icon, inset, -inset)
+    icon.backdrop:SetPoint("BOTTOMRIGHT", icon, -inset, inset)
 end
   local watch=row.Watch or row.watch or row.Check or row.WatchCheck
   if watch and S and S.HandleCheckBox then S:HandleCheckBox(watch) end
@@ -1163,20 +1169,6 @@ local function FixTokenIcon(icon)
     icon.__patched = true
 end
 
--- The pvpcurrency emblem art (arena/honor) is drawn small inside a lot of empty
--- canvas, so the standard .08 crop still leaves the icon frame around blank space.
--- Crop those tighter to the visible emblem; keep the normal crop for other icons.
--- Applied per row on every update because the rows are recycled across scroll.
-local function FitTokenIconCrop(icon)
-    if not icon or not icon.GetTexture then return end
-    local tex = icon:GetTexture()
-    if type(tex) == "string" and tex:lower():find("pvpcurrency", 1, true) then
-        icon:SetTexCoord(0.18, 0.82, 0.18, 0.82)
-    else
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    end
-end
-
 local function SkinTokenRow(i)
     local row = _G["TokenFrameContainerButton"..i]
     if not row then return end
@@ -1190,7 +1182,6 @@ local function SkinTokenRow(i)
         local ic = row.icon or row.Icon
         if ic then
             FixTokenIcon(ic)
-            FitTokenIconCrop(ic)
             if not ic.backdrop then
                 local b = MakeBD(row)
                 b:SetPoint("TOPLEFT", ic, -1, 1)

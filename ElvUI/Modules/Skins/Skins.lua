@@ -512,14 +512,12 @@ local handleCloseButtonOnLeave = function(btn) if btn.Texture then btn.Texture:S
 function S:HandleCloseButton(f, point)
 	if not f then return end
 
-	-- Idempotent: once our "X" exists, don't StripTextures again — that would wipe
-	-- our own f.Texture (it's a region of f), which is what made close buttons vanish
-	-- when this ran more than once (mass hook / OnShow re-skin).
-	if f.Texture then
-		if point then f:Point("TOPRIGHT", point, "TOPRIGHT", 2, 3) end
-		return
-	end
-
+	-- Always StripTextures: the server's CloseButton2X_Apply adds red textures as new
+	-- regions on the button (via CreateTexture, not SetNormalTexture), so they survive
+	-- our setter noops — stripping is what removes them. StripTextures also blanks our
+	-- own f.Texture (it's a region of f), so re-set it afterwards rather than skipping
+	-- the strip, which keeps this idempotent: repeated calls (mass hook / OnShow /
+	-- per-window) clear any freshly-added red and keep exactly one ElvUI "X".
 	f:StripTextures()
 
 	if f:GetNormalTexture() then f:SetNormalTexture("") f.SetNormalTexture = E.noop end
@@ -533,6 +531,9 @@ function S:HandleCloseButton(f, point)
 		f:HookScript("OnEnter", handleCloseButtonOnEnter)
 		f:HookScript("OnLeave", handleCloseButtonOnLeave)
 		f:SetHitRectInsets(7, 6, 7, 6)
+	else
+		-- StripTextures blanked it; restore our X.
+		f.Texture:SetTexture(E.Media.Textures.Close)
 	end
 
 	if point then
