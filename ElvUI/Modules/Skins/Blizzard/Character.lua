@@ -6,6 +6,7 @@ local ipairs = ipairs
 local unpack = unpack
 local math_max = math.max
 local floor = math.floor
+local strfind = string.find
 
 local function SafeHandleTab(tab)
 	if not tab then return end
@@ -34,6 +35,48 @@ local function MakeBD(parent, w, h)
         f:SetBackdropBorderColor(0,0,0,1)
     end
     return f
+end
+
+-- NOZDOR: the redesigned PaperDollFrame builds its inner panels from
+-- InsetFrameTemplate (metallic _UI-Frame borders) plus PaperDollInfoPart* panel
+-- art, and re-applies that art after ElvUI's one-time strip has already run. Blank
+-- the decorative borders/backgrounds on every PaperDoll show so the flat ElvUI
+-- backdrop shows through. Surgical: only touches the inset-border regions and the
+-- PaperDollInfoPart/_UI-Frame textures, never the stats text, model or item slots.
+local INSET_BORDER_KEYS = {
+	"InsetBorderTop", "InsetBorderBottom", "InsetBorderLeft", "InsetBorderRight",
+	"InsetBorderTopLeft", "InsetBorderTopRight", "InsetBorderBottomLeft", "InsetBorderBottomRight",
+}
+
+local function CleanInsetPanel(frame)
+	if not frame then return end
+	for _, key in ipairs(INSET_BORDER_KEYS) do
+		local region = frame[key]
+		if region and region.SetTexture then
+			region:SetTexture(nil)
+			region:SetAlpha(0)
+		end
+	end
+	if not frame.GetRegions then return end
+	local i = 1
+	while true do
+		local r = select(i, frame:GetRegions())
+		if not r then break end
+		if r.GetObjectType and r:GetObjectType() == "Texture" then
+			local tex = r.GetTexture and r:GetTexture()
+			if tex and (strfind(tex, "PaperDollInfoPart", 1, true) or strfind(tex, "_UI-Frame", 1, true)) then
+				r:SetTexture(nil)
+				r:SetAlpha(0)
+			end
+		end
+		i = i + 1
+	end
+end
+
+local function CleanPaperDollDecor()
+	CleanInsetPanel(_G.PaperDollFrameNewPanel)
+	CleanInsetPanel(_G.PaperDollFrameEquipInset)
+	CleanInsetPanel(_G.PaperDollFrameInset)
 end
 
 local function LoadSkin()
@@ -184,6 +227,13 @@ end
 	end
 
 	if _G.PaperDollFrame then
+		-- The inner panels are re-textured after ElvUI's one-time strip, so clean
+		-- their decorative borders/backgrounds on every show and after each stats
+		-- relayout (and once now).
+		_G.PaperDollFrame:HookScript("OnShow", CleanPaperDollDecor)
+		if _G.PaperDollFrame_UpdateStats then hooksecurefunc("PaperDollFrame_UpdateStats", CleanPaperDollDecor) end
+		CleanPaperDollDecor()
+
 		local slots = {
 			[1] = _G.CharacterHeadSlot,[2] = _G.CharacterNeckSlot,[3] = _G.CharacterShoulderSlot,[4] = _G.CharacterShirtSlot,
 			[5] = _G.CharacterChestSlot,[6] = _G.CharacterWaistSlot,[7] = _G.CharacterLegsSlot,[8] = _G.CharacterFeetSlot,
