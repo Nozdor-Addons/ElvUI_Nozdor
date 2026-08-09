@@ -148,6 +148,7 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		hide(_G.InspectPaperDollRockBg)
 		hide(_G.InspectPaperDollHeaderRock)
 		hide(_G.InspectPaperDollTopTileStreaks)
+		hide(_G.InspectBottomDivider)
 		flattenInset(_G.InspectPaperDollInset)
 		-- Model scene under the character (DressUp-<Race> quadrants + overlay) — hide
 		-- it like the player character frame so the model sits on the flat backdrop.
