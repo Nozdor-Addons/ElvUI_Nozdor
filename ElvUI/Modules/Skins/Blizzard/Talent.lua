@@ -265,15 +265,31 @@ do
 		end
 	end
 
+	-- Side spec tabs: drop the SpellBook-SkillLineTab backing (a 64x64 texture that
+	-- sticks out behind the 32x32 button) and keep only the spec picture itself.
 	for i = 1, MAX_TALENT_TABS do
 		local tab = _G["PlayerSpecTab"..i]
-		tab:GetRegions():Hide()
+		if tab then
+			local bg = _G["PlayerSpecTab"..i.."Background"]
+			if bg then bg:SetTexture(nil); bg:SetAlpha(0) end
+			local nt = tab:GetNormalTexture()
+			if nt then
+				nt:SetTexCoord(unpack(E.TexCoords))
+				nt:ClearAllPoints()
+				nt:SetAllPoints(tab)
+			end
+		end
+	end
 
-		tab:SetTemplate("Default")
-		tab:StyleButton(nil, true)
-
-		tab:GetNormalTexture():SetInside()
-		tab:GetNormalTexture():SetTexCoord(unpack(E.TexCoords))
+	-- "Buy second spec" side button: same SkillLineTab backing; keep only its icon.
+	if _G.PlayerBuySpecButton then
+		if _G.PlayerBuySpecButtonBackground then
+			_G.PlayerBuySpecButtonBackground:SetTexture(nil)
+			_G.PlayerBuySpecButtonBackground:SetAlpha(0)
+		end
+		if _G.PlayerBuySpecButtonIcon then
+			_G.PlayerBuySpecButtonIcon:SetTexCoord(unpack(E.TexCoords))
+		end
 	end
 
 	PlayerTalentFrameStatusFrame:Point("TOPLEFT", 57, -40)
