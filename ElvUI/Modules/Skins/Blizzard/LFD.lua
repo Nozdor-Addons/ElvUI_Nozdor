@@ -269,7 +269,7 @@ do
 	-- Blizzard divider bars.
 	local BG_PATTERNS = {
 		"ui%-background%-rock", "ui%-background%-marble", "bluemenu",
-		"pvpqueue", "ui%-lfg%-background", "ui%-lfg%-bluebg", "[_!]ui%-frame",
+		"pvpqueue", "ui%-lfg%-background", "ui%-lfg%-bluebg", "ui%-frame",
 		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
 		"char%-paperdoll", "char%-inner", "%-goldborder",
 	}
@@ -292,11 +292,22 @@ do
 		depth = depth or 0
 		if not frame or depth > 12 then return end
 		-- InsetFrameTemplate marble + border pieces (parentKeys).
+		local isInset = frame.Bgs ~= nil
 		for _, key in ipairs(INSET_BORDER) do
 			local r = frame[key]
-			if r and r.SetAlpha then r:SetAlpha(0); if r.Hide then r:Hide() end end
+			if r then isInset = true; if r.SetAlpha then r:SetAlpha(0); if r.Hide then r:Hide() end end end
 		end
 		if frame.Bgs and frame.Bgs.SetAlpha then frame.Bgs:SetAlpha(0) end
+		-- Content panels (a sizeable InsetFrameTemplate) get a dark recessed ElvUI
+		-- backdrop so the darkening follows the actual content per view, instead of
+		-- one big rectangle. Tiny chrome insets are just flattened above.
+		if isInset and not frame.__euiBackdrop and frame.CreateBackdrop and frame.GetWidth then
+			local w, h = frame:GetWidth() or 0, frame:GetHeight() or 0
+			if w > 60 and h > 60 then
+				frame.__euiBackdrop = true
+				frame:CreateBackdrop("Transparent")
+			end
+		end
 		-- Own decorative background texture regions.
 		if frame.GetRegions then
 			for _, r in ipairs({ frame:GetRegions() }) do
