@@ -271,7 +271,7 @@ do
 		"ui%-background%-rock", "ui%-background%-marble", "bluemenu",
 		"pvpqueue", "ui%-lfg%-background", "ui%-lfg%-bluebg", "ui%-frame",
 		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
-		"char%-paperdoll", "char%-inner", "%-goldborder",
+		"char%-paperdoll", "char%-inner", "%-goldborder", "common%-dropdown",
 	}
 	local function isBgTexture(t)
 		if type(t) ~= "string" then return false end
@@ -291,6 +291,11 @@ do
 	local function sweep(frame, depth)
 		depth = depth or 0
 		if not frame or depth > 12 then return end
+		-- Skip the arena-points bar: its track/fill/ring use Interface\FrameGeneral\
+		-- pvpqueue (same texture as the container bg), so the pattern sweep would
+		-- wrongly blank the whole bar. Leave it to the server.
+		local apb = _G.HK_PvpDevContainer and _G.HK_PvpDevContainer._hkArenaBar
+		if apb and frame == apb then return end
 		-- InsetFrameTemplate marble + border pieces (parentKeys).
 		local isInset = frame.Bgs ~= nil
 		for _, key in ipairs(INSET_BORDER) do
@@ -323,7 +328,11 @@ do
 			if ot == "Slider" and name:find("ScrollBar$") then
 				frame.__euiFinder = true
 				if S.HandleScrollBar then S:HandleScrollBar(frame) end
-			elseif _G[name.."Button"] and _G[name.."Text"] and _G[name.."Middle"] then
+			elseif ot == "Button" and _G[name.."Left"] and _G[name.."Middle"] and _G[name.."Right"] then
+				-- 3-slice UIPanelButtonTemplate (e.g. HK_PvpDevContainerJoinBtn).
+				frame.__euiFinder = true
+				if S.HandleButton then S:HandleButton(frame) end
+			elseif ot ~= "Button" and _G[name.."Button"] and _G[name.."Text"] and _G[name.."Middle"] then
 				frame.__euiFinder = true
 				if S.HandleDropDownBox then S:HandleDropDownBox(frame) end
 			end
@@ -412,12 +421,29 @@ do
 			end
 		end
 
+		-- Dark strip under the role buttons, extended right to the window edge.
+		local function DarkenRoleStrip()
+			local ri = _G.HK_LFDRoleInset
+			if not ri then return end
+			if not ri.__euiBackdrop then
+				ri.__euiBackdrop = true
+				ri:CreateBackdrop("Transparent")
+			end
+			if ri.backdrop then
+				ri.backdrop:ClearAllPoints()
+				ri.backdrop:Point("TOPLEFT", ri, "TOPLEFT", 0, 0)
+				ri.backdrop:Point("BOTTOMLEFT", ri, "BOTTOMLEFT", 0, 0)
+				ri.backdrop:Point("RIGHT", frame, "RIGHT", -4, 0)
+			end
+		end
+
 		local function SkinAll()
 			FlattenChrome()
 			sweep(frame, 0)
 			SkinTabs()
 			SkinButtons()
 			FixContentBackdrop()
+			DarkenRoleStrip()
 		end
 		SkinAll()
 
