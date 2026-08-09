@@ -58,110 +58,18 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	CleanTalentChrome()
 	GlyphFrame:HookScript("OnShow", CleanTalentChrome)
 
-	local function MatchTalentFrameSize()
-		if PlayerTalentFrame then
-			local w, h = PlayerTalentFrame:GetSize()
-			if w and h and w > 0 and h > 0 then
-				GlyphFrame:SetSize(w, h + 127)
-			end
-		end
-	end
-
-	GlyphFrame:HookScript("OnShow", MatchTalentFrameSize)
-	MatchTalentFrameSize()
-
-	-- ==== TUNING ====
-	-- Size of the parchment area (and the layout radius) relative to Blizzard's default.
-	-- The server redesigned the glyph view: the parchment area is the LEFT inset
-	-- (PlayerTalentFrame.contentInset, width 436) and the glyph list lives in the
-	-- right inset. Centre the parchment on that left area (not on the whole wide
-	-- window) and keep the scale small enough to fit inside it, otherwise the
-	-- parchment looks zoomed and the glyph rings spill across the window.
-	local paperScale = 1.15
-	-- Size of the glyph buttons relative to default
-	local slotScale  = 1.0    -- keep close to paperScale
-	-- Vertical nudge for the whole parchment block (helps center it visually)
-	local yOffset    = 0
-	-- =================
-
-	-- Base size used by Blizzard/ElvUI skin in 3.3.5
-	local baseW, baseH = 335, 349
-
-	-- Create a real frame to hold parchment + buttons.
-	-- IMPORTANT: Buttons cannot be parented to a Texture, only a Frame.
-	local holder = _G.GlyphFrameElvUIHolder
-	if not holder then
-		holder = CreateFrame("Frame", "GlyphFrameElvUIHolder", GlyphFrame)
-	end
-	-- Anchor to the server's left glyph area when present, so the parchment sits
-	-- in the glyph column rather than centred over the whole (wide) glyph window.
-	local function AnchorHolder()
-		local glyphArea = _G.PlayerTalentFrame and _G.PlayerTalentFrame.contentInset
-		holder:ClearAllPoints()
-		if glyphArea then
-			holder:SetPoint("CENTER", glyphArea, "CENTER", 0, yOffset)
-		else
-			holder:SetPoint("CENTER", GlyphFrame, "CENTER", 0, yOffset)
-		end
-		holder:SetSize(baseW * paperScale, baseH * paperScale)
-	end
-	AnchorHolder()
-	holder:SetFrameLevel(GlyphFrame:GetFrameLevel() + 1)
-
-	-- Parchment texture
-	GlyphFrameBackground:ClearAllPoints()
-	GlyphFrameBackground:SetParent(holder)
-	GlyphFrameBackground:SetAllPoints(holder)
-	GlyphFrameBackground:SetDrawLayer("BACKGROUND", 0)
-	GlyphFrameBackground:SetTexture("Interface\\Spellbook\\UI-GlyphFrame")
-	-- texWidth, texHeight, cropWidth, cropHeight, offsetX, offsetY = 512, 512, 315, 340, 21, 72
-	GlyphFrameBackground:SetTexCoord(0.041015625, 0.65625, 0.140625, 0.8046875)
-
-	-- Glow
-	GlyphFrameGlow:ClearAllPoints()
-	GlyphFrameGlow:SetParent(holder)
-	GlyphFrameGlow:SetAllPoints(holder)
-	GlyphFrameGlow:SetDrawLayer("BACKGROUND", 1)
-	GlyphFrameGlow:SetTexture("Interface\\Spellbook\\UI-GlyphFrame-Glow")
-	-- texWidth, texHeight, cropWidth, cropHeight, offsetX, offsetY = 512, 512, 315, 340, 30, 34
-	GlyphFrameGlow:SetTexCoord(0.05859375, 0.673828125, 0.06640625, 0.73046875)
-
-	-- Positions are relative to CENTER of parchment.
-	-- We scale the offsets with paperScale, and scale the buttons with slotScale.
-	local glyphPositions = {
-		{"CENTER", -1, 126},   -- 1 top
-		{"CENTER", -1, -119},  -- 2 bottom
-		{"TOPLEFT", 8, -62},   -- 3 top-left
-		{"BOTTOMRIGHT", -10, 70}, -- 4 bottom-right
-		{"TOPRIGHT", -8, -62}, -- 5 top-right
-		{"BOTTOMLEFT", 7, 70}  -- 6 bottom-left
-	}
-
-	local function ApplyGlyphLayout()
-		AnchorHolder()
-		HideGlyphRock()
-		local glyphFrameLevel = holder:GetFrameLevel() + 5
-
-		for i = 1, 6 do
-			local btn = _G["GlyphFrameGlyph"..i]
-			if btn then
-				btn:SetParent(holder) -- parent MUST be a Frame (not a Texture)
-				btn:SetFrameLevel(glyphFrameLevel)
-				btn:SetScale(slotScale)
-
-				btn:ClearAllPoints()
-				local p, x, y = glyphPositions[i][1], glyphPositions[i][2], glyphPositions[i][3]
-				btn:SetPoint(p, holder, p, x * paperScale, y * paperScale)
-			end
-		end
-	end
-
-	ApplyGlyphLayout()
-
-	-- Re-apply after Blizzard updates the glyph frame (prevents drift/overlap)
+	-- Parchment + glyph rings are OWNED BY THE SERVER now. The redesigned glyph view
+	-- draws GlyphFrameBackground (Interface\FrameGeneral\glyph-bg, ~430x408) anchored
+	-- to PlayerTalentFrame.contentInset, and positions the six glyph sockets relative
+	-- to that background (GlyphFrame_PositionSockets, tuned glyphPositions). The old
+	-- ElvUI code re-parented the parchment into its own holder, swapped it for the
+	-- Spellbook UI-GlyphFrame texture and re-laid the rings at stock offsets — which
+	-- is exactly what made the parchment look zoomed and scattered the rings. Leave
+	-- the server layout alone; we only do window chrome + the finder-panel skin.
+	-- Just make sure the rock base stays hidden as the view updates.
 	hooksecurefunc("GlyphFrame_Update", function()
 		if GlyphFrame and GlyphFrame:IsShown() then
-			ApplyGlyphLayout()
+			HideGlyphRock()
 		end
 	end)
 
