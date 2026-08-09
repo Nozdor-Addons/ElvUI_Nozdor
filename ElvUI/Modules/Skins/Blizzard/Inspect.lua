@@ -130,7 +130,8 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		if tab then
 			S:HandleTab(tab)
 			if tab.backdrop then
-				tab.backdrop:Point("TOPLEFT", tab, "TOPLEFT", 2, 0)
+				-- Pull the backdrop 1px down out of the window (tabs overlapped it).
+				tab.backdrop:Point("TOPLEFT", tab, "TOPLEFT", 2, -1)
 				tab.backdrop:Point("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -2, 2)
 				tab:SetHitRectInsets(0, 0, 0, 0)
 			end
