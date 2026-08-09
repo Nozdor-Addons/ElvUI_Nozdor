@@ -275,6 +275,7 @@ do
 		"ui%-lfg%-background", "ui%-lfg%-bluebg", "ui%-frame",
 		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
 		"char%-paperdoll", "char%-inner", "%-goldborder", "common%-dropdown",
+		"itemupgrade", "orderhalltalents",
 	}
 	local function isBgTexture(t)
 		if type(t) ~= "string" then return false end
@@ -422,8 +423,19 @@ do
 		end
 		-- Dropdowns / scrollbars / buttons / editboxes found anywhere in the tree.
 		local name = frame.GetName and frame:GetName()
+		local ot = frame.GetObjectType and frame:GetObjectType()
+		-- 3-slice UIPanelButtonTemplate buttons, incl. ANONYMOUS ones (e.g. the gear
+		-- upgrade button) which expose their slices as parentKeys .Left/.Middle/.Right
+		-- rather than globals — the named-only branch below would miss those.
+		if ot == "Button" and not frame.__euiFinder then
+			local threeSlice = (frame.Left and frame.Middle and frame.Right)
+				or (name and _G[name.."Left"] and _G[name.."Middle"] and _G[name.."Right"])
+			if threeSlice then
+				frame.__euiFinder = true
+				if S.HandleButton then S:HandleButton(frame) end
+			end
+		end
 		if name and not frame.__euiFinder then
-			local ot = frame.GetObjectType and frame:GetObjectType()
 			if ot == "Slider" and name:find("ScrollBar$") then
 				frame.__euiFinder = true
 				if S.HandleScrollBar then S:HandleScrollBar(frame) end
@@ -446,10 +458,6 @@ do
 					frame.__euiFinder = true
 					if S.HandleEditBox then S:HandleEditBox(frame) end
 				end
-			elseif ot == "Button" and _G[name.."Left"] and _G[name.."Middle"] and _G[name.."Right"] then
-				-- 3-slice UIPanelButtonTemplate (e.g. HK_PvpDevContainerJoinBtn).
-				frame.__euiFinder = true
-				if S.HandleButton then S:HandleButton(frame) end
 			elseif ot ~= "Button" and _G[name.."Button"] and _G[name.."Middle"] then
 				-- Dropdown (UIDropDownMenu-like): a Frame with an arrow button + middle.
 				frame.__euiFinder = true
@@ -574,6 +582,46 @@ do
 			hooksecurefunc("HK_LFDShell_ApplyFinderDropdownLayout", function(dd)
 				skinFinderDropdown(dd)
 			end)
+		end
+
+		-- Spectate view (PVPSpectatorFrame under HK_SpectatorHost): shown and
+		-- re-decorated by the server on demand, so the one-shot SkinAll misses it and
+		-- the server re-paints the inset background each pass. Re-skin after every
+		-- spectator content layout: sweep the host + frame (buttons, scrollbar), blank
+		-- the marble the server re-applies, and hide the leftover portrait/eye model.
+		local function SkinSpectator()
+			local host = _G.HK_SpectatorHost
+			if host then sweep(host, 0) end
+			if _G.PVPSpectatorFrame then sweep(_G.PVPSpectatorFrame, 0) end
+			local inset = host and host.inset
+			if inset and inset.Bgs and inset.Bgs.SetAlpha then inset.Bgs:SetAlpha(0) end
+			hide(_G.PVPSpectatorFramePortrait)
+			local pm = _G.PVPSpectatorFramePortraitModelModel or _G.PVPSpectatorFramePortraitModel
+			if pm and pm.Hide then pm:Hide() end
+		end
+		if _G.HK_LFDShell_ApplySpectatorContentLayout then
+			hooksecurefunc("HK_LFDShell_ApplySpectatorContentLayout", SkinSpectator)
+		end
+
+		-- Gear upgrade tab (HK_GearUpgradeContainer): the itemupgrade atlas top/bottom
+		-- art becomes a flat dark backdrop; the (anonymous) upgrade button and honor/arena
+		-- dropdowns get skinned by the sweep. Re-run after each gear layout pass.
+		local function SkinGear()
+			local c = _G.HK_GearUpgradeContainer
+			if not c then return end
+			if c.top and c.top.SetAlpha then c.top:SetAlpha(0) end
+			if c.bottom and c.bottom.SetAlpha then c.bottom:SetAlpha(0) end
+			if not c.__euiBackdrop and c.CreateBackdrop then
+				c.__euiBackdrop = true
+				c:CreateBackdrop("Transparent")
+				if c.backdrop and c.backdrop.SetFrameLevel then
+					c.backdrop:SetFrameLevel(math.max(0, (c:GetFrameLevel() or 1) - 1))
+				end
+			end
+			sweep(c, 0)
+		end
+		if _G.HK_GearUpgrade_ApplyLayout then
+			hooksecurefunc("HK_GearUpgrade_ApplyLayout", SkinGear)
 		end
 
 		-- The bottom tab bar (HK_LFDTopTabBar, anchored below the window) sits 2px too
