@@ -65,8 +65,8 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_Runes", function()
 	-- MetalFrame2X. Bring it fully to the ElvUI look — background, frame, scrollbar
 	-- and action buttons. The rune list rows are the server's content and are left
 	-- as-is. Buttons re-texture themselves on state/show, so re-apply on every show.
-	local function ReapplyRunePopup()
-		local panel = _G.UlduarRuneSelectionPanel
+	local function ReapplyRunePopup(panel)
+		panel = panel or _G.UlduarRuneSelectionPanel
 		if not panel then return end
 
 		-- Background + any leftover host chrome -> flat.
@@ -79,8 +79,8 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_Runes", function()
 		if _G.UlduarRuneRemoveAllButton then S:HandleButton(_G.UlduarRuneRemoveAllButton) end
 	end
 
-	local function SkinRunePopup()
-		local panel = _G.UlduarRuneSelectionPanel
+	local function SkinRunePopup(panel)
+		panel = panel or _G.UlduarRuneSelectionPanel
 		if not panel then return end
 
 		if not panel.__euiSkinned then
@@ -107,13 +107,18 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_Runes", function()
 				S:HandleScrollBar(_G.UlduarRuneScrollFrameScrollBar)
 			end
 
-			panel:HookScript("OnShow", ReapplyRunePopup)
+			panel:HookScript("OnShow", function(self) ReapplyRunePopup(self) end)
 		end
 
-		ReapplyRunePopup()
+		ReapplyRunePopup(panel)
 	end
 
-	if _G.UlduarSecretsFrame_BrightRunes_OnClick then
-		hooksecurefunc("UlduarSecretsFrame_BrightRunes_OnClick", SkinRunePopup)
+	-- PopulateRuneList(panel, runesData) is global and runs on every panel open
+	-- (the side menu is dynamic — opened/closed per rune click), so it is the
+	-- reliable place to (re)skin. It receives the panel as its first argument.
+	if _G.PopulateRuneList then
+		hooksecurefunc("PopulateRuneList", function(panel)
+			SkinRunePopup(panel)
+		end)
 	end
 end)
