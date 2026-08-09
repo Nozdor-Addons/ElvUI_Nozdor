@@ -263,11 +263,15 @@ do
 		"InsetBorderTop", "InsetBorderBottom", "InsetBorderLeft", "InsetBorderRight",
 	}
 
-	-- Decorative background art paths anywhere in the finder tree.
+	-- Decorative background art paths anywhere in the finder tree. Kept broad on
+	-- purpose: [_!]ui-frame catches both _UI-Frame and !UI-Frame; "bluemenu" catches
+	-- bluemenu-main AND bluemenu-goldborder-*; char-paperdoll/char-inner catch the
+	-- Blizzard divider bars.
 	local BG_PATTERNS = {
-		"ui%-background%-rock", "ui%-background%-marble", "bluemenu%-main",
-		"pvpqueue", "ui%-lfg%-background", "ui%-lfg%-bluebg", "_ui%-frame",
+		"ui%-background%-rock", "ui%-background%-marble", "bluemenu",
+		"pvpqueue", "ui%-lfg%-background", "ui%-lfg%-bluebg", "[_!]ui%-frame",
 		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
+		"char%-paperdoll", "char%-inner", "%-goldborder",
 	}
 	local function isBgTexture(t)
 		if type(t) ~= "string" then return false end
@@ -282,10 +286,11 @@ do
 		if obj and obj.SetAlpha then obj:SetAlpha(0) end
 	end
 
-	-- Recursively flatten every inset + background texture in a frame subtree.
+	-- Recursively flatten every inset + background texture in a frame subtree, and
+	-- skin any dropdown/scrollbar found along the way.
 	local function sweep(frame, depth)
 		depth = depth or 0
-		if not frame or depth > 10 then return end
+		if not frame or depth > 12 then return end
 		-- InsetFrameTemplate marble + border pieces (parentKeys).
 		for _, key in ipairs(INSET_BORDER) do
 			local r = frame[key]
@@ -298,6 +303,18 @@ do
 				if r.GetObjectType and r:GetObjectType() == "Texture" and r.GetTexture and isBgTexture(r:GetTexture()) then
 					r:SetAlpha(0)
 				end
+			end
+		end
+		-- Dropdowns / scrollbars found anywhere in the tree.
+		local name = frame.GetName and frame:GetName()
+		if name and not frame.__euiFinder then
+			local ot = frame.GetObjectType and frame:GetObjectType()
+			if ot == "Slider" and name:find("ScrollBar$") then
+				frame.__euiFinder = true
+				if S.HandleScrollBar then S:HandleScrollBar(frame) end
+			elseif _G[name.."Button"] and _G[name.."Text"] and _G[name.."Middle"] then
+				frame.__euiFinder = true
+				if S.HandleDropDownBox then S:HandleDropDownBox(frame) end
 			end
 		end
 		-- Recurse into child frames.
@@ -329,21 +346,6 @@ do
 			if _G.HK_LFDPortraitFrame then _G.HK_LFDPortraitFrame:Hide() end
 		end
 
-		-- Dropdowns (dungeon/role + premade selectors).
-		local DROPDOWNS = {
-			"LFDQueueFrameTypeDropDown",
-			"HK_PremadeContainerDungeonDropDown", "HK_PremadeContainerDifficultyDropDown",
-		}
-		local function SkinDropdowns()
-			for _, n in ipairs(DROPDOWNS) do
-				local dd = _G[n]
-				if dd and not dd.__euiSkinned then
-					dd.__euiSkinned = true
-					if S.HandleDropDownBox then S:HandleDropDownBox(dd) end
-				end
-			end
-		end
-
 		-- Top tabs (Dungeons / PvP / Stats / Gear / Keys).
 		local TOP_TABS = {
 			"HK_LFDTopTabDungeons", "HK_LFDTopTabPvp", "HK_LFDTopTabStats",
@@ -357,25 +359,54 @@ do
 					if tab.bg then tab.bg:SetAlpha(0) end
 					if tab.selection then tab.selection:SetAlpha(0) end
 					if S.HandleTab then S:HandleTab(tab) end
+					-- Tighten the backdrop to the tab (default HandleTab insets detach it).
+					if tab.backdrop then
+						tab.backdrop:ClearAllPoints()
+						tab.backdrop:Point("TOPLEFT", tab, "TOPLEFT", 2, -2)
+						tab.backdrop:Point("BOTTOMRIGHT", tab, "BOTTOMRIGHT", -2, 2)
+					end
 				end
 			end
 		end
 
-		-- Battle Pass sidebar button -> ElvUI button.
+		-- Battle Pass sidebar button -> small ElvUI button (was 185x44 store art).
 		local function SkinButtons()
 			local bp = _G.HK_LFDBattlePassButton
 			if bp and not bp.__euiSkinned then
 				bp.__euiSkinned = true
 				if S.HandleButton then S:HandleButton(bp) end
+				bp:SetSize(120, 22)
+				if bp.Highlight then bp.Highlight:SetTexture(nil) end
+				-- Re-centre the "Боевой пропуск" label (was offset for the store icon).
+				if bp.GetRegions then
+					for _, r in ipairs({ bp:GetRegions() }) do
+						if r.GetObjectType and r:GetObjectType() == "FontString" then
+							r:ClearAllPoints()
+							r:SetPoint("CENTER", bp, "CENTER", 0, 0)
+							r:SetJustifyH("CENTER")
+						end
+					end
+				end
+			end
+		end
+
+		-- Narrow the queue-frame dark backdrop (added by the stock LFD skin) to just
+		-- the right-hand content, i.e. right of the sidebar (it spanned the whole width).
+		local function FixContentBackdrop()
+			local q = _G.LFDQueueFrame
+			if q and q.backdrop and _G.HK_LFDSidebar then
+				q.backdrop:ClearAllPoints()
+				q.backdrop:Point("TOPLEFT", _G.HK_LFDSidebar, "TOPRIGHT", 4, 0)
+				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -3, 4)
 			end
 		end
 
 		local function SkinAll()
 			FlattenChrome()
 			sweep(frame, 0)
-			SkinDropdowns()
 			SkinTabs()
 			SkinButtons()
+			FixContentBackdrop()
 		end
 		SkinAll()
 
