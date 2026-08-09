@@ -110,9 +110,12 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 	-- server re-textures the ring on show/unit-change, so re-flatten on that.
 	local function FlattenChrome()
 		if S.HandleMetalFrame then S:HandleMetalFrame(InspectFrame, InspectFrame.backdrop) end
-		-- Portrait(s): HandleMetalFrame hides ringPortrait/specRingIcon, but the
-		-- stock InspectFramePortrait can still show — hide it too.
+		-- Portrait(s): HandleMetalFrame hides ringPortrait/specRingIcon, but the stock
+		-- portrait texture AND the 3D portrait model (InspectFramePortraitModel, a
+		-- PlayerModel parented to InspectFrame) still show — hide them too.
 		hide(_G.InspectFramePortrait)
+		if _G.InspectFramePortraitModel then _G.InspectFramePortraitModel:Hide() end
+		if _G.InspectFramePortraitModelModel then _G.InspectFramePortraitModelModel:Hide() end
 		if InspectFrame.portrait then hide(InspectFrame.portrait) end
 		if InspectFrame.ringPortrait then InspectFrame.ringPortrait:Hide() end
 	end
@@ -153,6 +156,10 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		hide(_G.InspectModelFrameBgBotLeft)
 		hide(_G.InspectModelFrameBgBotRight)
 		hide(_G.InspectModelFrameBgOverlay)
+		-- Model frame border (Char-Paperdoll-Horizontal/Vertical edges).
+		for _, sfx in ipairs({ "Top", "Bottom", "Left", "Right", "TopLeft", "TopRight", "BottomLeft", "BottomRight" }) do
+			hide(_G["InspectModelBorder"..sfx])
+		end
 	end
 
 	local function SkinPVP()
@@ -167,7 +174,9 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 				if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
 			end
 			-- This inset's fill is a pvp-conquest art texture on parentKey .Bg (not
-			-- .Bgs). Reuse it as a strong dark area (darker than the normal bg).
+			-- .Bgs). Hide the default marble Bgs behind it, then reuse .Bg as a strong
+			-- dark area (darker than the normal bg).
+			hide(inset.Bgs)
 			darkenTex(inset.Bg or inset.Bgs, 0.75)
 		end
 	end
@@ -177,7 +186,17 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 	-- buttons draw above the column inset, so this doesn't cover the icons.
 	local function SkinTalentGrid()
 		for c = 1, 3 do
-			darkenInset(_G["InspectTalentFrameGridColumn"..c.."Inset"])
+			local col = _G["InspectTalentFrameGridColumn"..c]
+			local inset = _G["InspectTalentFrameGridColumn"..c.."Inset"]
+			if inset then
+				darkenInset(inset)
+				-- The column inset is created after the talent buttons, so its dark
+				-- fill draws over them ("everything dark"). Push the inset below the
+				-- column content so the talent icons sit above the dark panel.
+				if col then
+					inset:SetFrameLevel(math.max((col:GetFrameLevel() or 1) - 1, 0))
+				end
+			end
 			for _, sfx in ipairs(GRID_BG_SUFFIX) do
 				hide(_G["InspectTalentFrameGridColumn"..c..sfx])
 			end
