@@ -266,10 +266,13 @@ do
 	-- Decorative background art paths anywhere in the finder tree. Kept broad on
 	-- purpose: [_!]ui-frame catches both _UI-Frame and !UI-Frame; "bluemenu" catches
 	-- bluemenu-main AND bluemenu-goldborder-*; char-paperdoll/char-inner catch the
-	-- Blizzard divider bars.
+	-- Blizzard divider bars. NB: "pvpqueue" is intentionally absent — in the finder
+	-- that atlas is used ONLY for content (currency rings, the season-record arrow,
+	-- the arena-points bar, the prestige ring), never for chrome, so blanking it
+	-- erased art the user wants kept.
 	local BG_PATTERNS = {
 		"ui%-background%-rock", "ui%-background%-marble", "bluemenu",
-		"pvpqueue", "ui%-lfg%-background", "ui%-lfg%-bluebg", "ui%-frame",
+		"ui%-lfg%-background", "ui%-lfg%-bluebg", "ui%-frame",
 		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
 		"char%-paperdoll", "char%-inner", "%-goldborder", "common%-dropdown",
 		"common%-input%-border",
@@ -287,13 +290,41 @@ do
 		if obj and obj.SetAlpha then obj:SetAlpha(0) end
 	end
 
+	-- Bulletproof dropdown arrow: the server re-applies its common-dropdown-a-button
+	-- texture on hover, and HandleDropDownBox/HandleNextPrevButton don't hold (early
+	-- return on isSkinned / existing backdrop). So kill + FREEZE the button's own
+	-- textures and draw our own ElvUI arrow overlay the server can't touch.
+	local function skinDropArrow(btn)
+		if not btn or btn.__euiArrow then return end
+		btn.__euiArrow = true
+		for _, g in ipairs({ "GetNormalTexture", "GetPushedTexture", "GetHighlightTexture", "GetDisabledTexture" }) do
+			local t = btn[g] and btn[g](btn)
+			if t then
+				t:SetTexture(nil); t:SetAlpha(0)
+				t.SetTexture = E.noop; t.SetAlpha = E.noop; t.Show = E.noop
+			end
+		end
+		btn.SetNormalTexture = E.noop
+		btn.SetPushedTexture = E.noop
+		btn.SetHighlightTexture = E.noop
+		btn.SetDisabledTexture = E.noop
+		local a = btn:CreateTexture(nil, "OVERLAY")
+		a:SetTexture(E.Media.Textures.ArrowUp)
+		a:SetRotation(S.ArrowRotation and S.ArrowRotation.down or 3.14) -- point down
+		a:SetSize(12, 12)
+		a:SetPoint("CENTER", btn, "CENTER", 0, 0)
+		a:SetVertexColor(1, 1, 1)
+	end
+	S.NozdorSkinDropArrow = skinDropArrow
+
 	-- Recursively flatten every inset + background texture in a frame subtree, and
 	-- skin any dropdown/scrollbar found along the way.
 	local function sweep(frame, depth)
 		depth = depth or 0
 		if not frame or depth > 12 then return end
-		-- Skip content frames that draw with a "background" texture (pvpqueue) we'd
-		-- otherwise blank: the arena-points bar and the prestige ring under the eagle.
+		-- Defensive: never descend into the pvp content frames (arena-points bar and
+		-- the prestige ring under the eagle). They draw with the pvpqueue atlas — which
+		-- we no longer blank — but keep the skip so no future pattern can erase them.
 		local apb = _G.HK_PvpDevContainer and _G.HK_PvpDevContainer._hkArenaBar
 		if apb and frame == apb then return end
 		if frame == _G.HK_PvpDevContainerDevInsetRing then return end
@@ -350,15 +381,7 @@ do
 						t.SetTexture = E.noop; t.SetAlpha = E.noop; t.Show = E.noop
 					end
 				end
-				local ddbtn = _G[name.."Button"]
-				if ddbtn then
-					if S.HandleNextPrevButton then S:HandleNextPrevButton(ddbtn) end
-					local nt = ddbtn.GetNormalTexture and ddbtn:GetNormalTexture()
-					if nt then nt.SetTexture = E.noop end
-					ddbtn.SetNormalTexture = E.noop
-					ddbtn.SetPushedTexture = E.noop
-					ddbtn.SetHighlightTexture = E.noop
-				end
+				skinDropArrow(_G[name.."Button"])
 			end
 		end
 		-- Recurse into child frames.
@@ -440,8 +463,9 @@ do
 			local q = _G.LFDQueueFrame
 			if q and q.backdrop and _G.HK_LFDSidebar then
 				q.backdrop:ClearAllPoints()
-				q.backdrop:Point("TOPLEFT", _G.HK_LFDSidebar, "TOPRIGHT", 4, 0)
-				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -3, 4)
+				-- Shifted 1px left so the darkening lines up with the PVE rewards content.
+				q.backdrop:Point("TOPLEFT", _G.HK_LFDSidebar, "TOPRIGHT", 3, 0)
+				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -4, 4)
 			end
 		end
 

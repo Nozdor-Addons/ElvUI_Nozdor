@@ -5,6 +5,33 @@ local S = E:GetModule("Skins")
 local _G = _G
 local unpack = unpack
 local type = type
+local ipairs = ipairs
+
+-- Bulletproof dropdown arrow (same fix as the finder): the server re-applies its
+-- common-dropdown-a-button texture on hover, and HandleDropDownBox early-returns on
+-- an existing backdrop, so the stock Blizzard arrow keeps flashing back. Kill and
+-- FREEZE the button's own textures and draw our own ElvUI arrow the server can't touch.
+local function skinDropArrow(btn)
+	if not btn or btn.__euiArrow then return end
+	btn.__euiArrow = true
+	for _, g in ipairs({ "GetNormalTexture", "GetPushedTexture", "GetHighlightTexture", "GetDisabledTexture" }) do
+		local t = btn[g] and btn[g](btn)
+		if t then
+			t:SetTexture(nil); t:SetAlpha(0)
+			t.SetTexture = E.noop; t.SetAlpha = E.noop; t.Show = E.noop
+		end
+	end
+	btn.SetNormalTexture = E.noop
+	btn.SetPushedTexture = E.noop
+	btn.SetHighlightTexture = E.noop
+	btn.SetDisabledTexture = E.noop
+	local a = btn:CreateTexture(nil, "OVERLAY")
+	a:SetTexture(E.Media.Textures.ArrowUp)
+	a:SetRotation(S.ArrowRotation and S.ArrowRotation.down or 3.14) -- point down
+	a:SetSize(12, 12)
+	a:SetPoint("CENTER", btn, "CENTER", 0, 0)
+	a:SetVertexColor(1, 1, 1)
+end
 
 S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	if not E.private.skins.blizzard.enable or not E.private.skins.blizzard.talent then return end
@@ -167,6 +194,8 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 			if ddButton and w and w > 1 then
 				ddButton:SetHitRectInsets(-(w - 35), 0, 0, 0)
 			end
+			-- Replace the server's flashing arrow with a frozen ElvUI down-arrow.
+			skinDropArrow(ddButton)
 		end
 
 		-- Bespoke scrollbar: the server drew a black rail + UI-Character-ScrollBar
