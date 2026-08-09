@@ -71,9 +71,30 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	-- is exactly what made the parchment look zoomed and scattered the rings. Leave
 	-- the server layout alone; we only do window chrome + the finder-panel skin.
 	-- Just make sure the rock base stays hidden as the view updates.
+	--
+	-- Also: make the parchment semi-transparent so the flat dark backdrop reads
+	-- through it, and keep the insertion glow (GlyphFrameGlow) sitting exactly over
+	-- the parchment — same rect, just above it, at the same alpha — so the two read
+	-- as one panel. The server re-anchors/re-shows both on update, so re-apply here.
+	local GLYPH_BG_ALPHA = 0.6
+	local function StyleGlyphParchment()
+		local bg = _G.GlyphFrameBackground
+		if bg then bg:SetAlpha(GLYPH_BG_ALPHA) end
+		local glow = _G.GlyphFrameGlow
+		if glow and bg then
+			glow:ClearAllPoints()
+			glow:SetAllPoints(bg)
+			glow:SetDrawLayer("BORDER", 0) -- just above the BACKGROUND parchment
+			glow:SetAlpha(GLYPH_BG_ALPHA)
+		end
+	end
+	StyleGlyphParchment()
+	GlyphFrame:HookScript("OnShow", StyleGlyphParchment)
+
 	hooksecurefunc("GlyphFrame_Update", function()
 		if GlyphFrame and GlyphFrame:IsShown() then
 			HideGlyphRock()
+			StyleGlyphParchment()
 		end
 	end)
 
@@ -132,9 +153,20 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 			S:HandleEditBox(sb)
 		end
 		local dd = _G.GlyphFrameAvailDropDown
-		if dd and not dd.__euiSkinned then
-			dd.__euiSkinned = true
-			S:HandleDropDownBox(dd)
+		if dd then
+			if not dd.__euiSkinned then
+				dd.__euiSkinned = true
+				S:HandleDropDownBox(dd)
+			end
+			-- Make the whole dropdown box open the menu, not just the arrow: extend
+			-- the arrow button's hit rect left across the box width. The box spans
+			-- ~contentInset2 width, so key the extension off that (set on each
+			-- populate, since the width is applied there).
+			local ddButton = _G.GlyphFrameAvailDropDownButton
+			local w = ci2:GetWidth()
+			if ddButton and w and w > 1 then
+				ddButton:SetHitRectInsets(-(w - 35), 0, 0, 0)
+			end
 		end
 
 		-- Bespoke scrollbar: the server drew a black rail + UI-Character-ScrollBar
@@ -164,6 +196,11 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 					h.__euiSkinned = true
 					BlankTextures(h)
 					h:CreateBackdrop("Transparent")
+					-- The backdrop plate draws above the header's own OVERLAY
+					-- FontStrings; re-parent the label + collapse sign onto the
+					-- backdrop so the title text and +/- sit above the plate.
+					if h.text then h.text:SetParent(h.backdrop) end
+					if h.sign then h.sign:SetParent(h.backdrop) end
 				end
 			end
 		end
