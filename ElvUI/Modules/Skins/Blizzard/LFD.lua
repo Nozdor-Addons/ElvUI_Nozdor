@@ -341,6 +341,11 @@ do
 				-- Dropdown (UIDropDownMenu-like): a Frame with an arrow button + middle.
 				frame.__euiFinder = true
 				if S.HandleDropDownBox then S:HandleDropDownBox(frame) end
+				-- Force the ElvUI arrow: HandleDropDownBox skips the arrow when a
+				-- backdrop already exists, and the server's custom arrow texture
+				-- (common-dropdown-a-button) otherwise stays.
+				local ddbtn = _G[name.."Button"]
+				if ddbtn and S.HandleNextPrevButton then S:HandleNextPrevButton(ddbtn) end
 			end
 		end
 		-- Recurse into child frames.
@@ -427,22 +432,6 @@ do
 			end
 		end
 
-		-- Dark strip under the role buttons, extended right to the window edge.
-		local function DarkenRoleStrip()
-			local ri = _G.HK_LFDRoleInset
-			if not ri then return end
-			if not ri.__euiBackdrop then
-				ri.__euiBackdrop = true
-				ri:CreateBackdrop("Transparent")
-			end
-			if ri.backdrop then
-				ri.backdrop:ClearAllPoints()
-				ri.backdrop:Point("TOPLEFT", ri, "TOPLEFT", 0, 0)
-				ri.backdrop:Point("BOTTOMLEFT", ri, "BOTTOMLEFT", 0, 0)
-				ri.backdrop:Point("RIGHT", frame, "RIGHT", -4, 0)
-			end
-		end
-
 		local function SkinAll()
 			FlattenChrome()
 			sweep(frame, 0)
@@ -452,7 +441,6 @@ do
 			SkinTabs()
 			SkinButtons()
 			FixContentBackdrop()
-			DarkenRoleStrip()
 		end
 		SkinAll()
 
