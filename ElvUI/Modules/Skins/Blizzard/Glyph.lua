@@ -13,8 +13,12 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 		TalentFrame_LoadUI()
 	end
 
-	-- Keep Blizzard's parchment texture; just remove ElvUI's full-frame textures
-	GlyphFrame:StripTextures()
+	-- Do NOT StripTextures the GlyphFrame: on this server GlyphFrame's only regions
+	-- are the parchment (GlyphFrameBackground = glyph-bg) and the socket glow, both
+	-- of which we want to keep. StripTextures would blank the parchment, and since
+	-- we no longer re-set it (the server owns the parchment now), the glyph view
+	-- would have no background at all. The ElvUI backdrop below is faded out while
+	-- the glyph tab is open, so it never covers the parchment.
 
 	if not GlyphFrame.backdrop then
 		GlyphFrame:CreateBackdrop("Transparent")
