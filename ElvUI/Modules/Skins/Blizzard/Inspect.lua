@@ -15,7 +15,9 @@ local GetInventoryItemLink = GetInventoryItemLink
 local CreateFrame = CreateFrame
 local floor = math.floor
 
--- InsetFrameTemplate marble border pieces (parentKeys) to hide.
+-- ==== base helpers (remove insets + backgrounds, the way the player windows do) ==
+
+-- InsetFrameTemplate marble border pieces (parentKeys).
 local INSET_BORDER = {
 	"InsetBorderTopLeft", "InsetBorderTopRight",
 	"InsetBorderBottomLeft", "InsetBorderBottomRight",
@@ -26,18 +28,47 @@ local GRID_BG_SUFFIX = {
 	"BackgroundBottomLeft", "BackgroundBottomRight",
 }
 
+local function hide(obj)
+	if obj and obj.SetAlpha then obj:SetAlpha(0) end
+end
+
+-- Flatten an InsetFrameTemplate: hide its marble Bgs + the 8 border pieces.
+local function flattenInset(inset)
+	if not inset then return end
+	for _, key in ipairs(INSET_BORDER) do
+		local r = inset[key]
+		if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
+	end
+	if inset.Bgs then inset.Bgs:SetAlpha(0) end
+end
+
+-- Reuse an inset's own (marble) Bgs region as a flat dark fill. Only safe when the
+-- inset sits BELOW the content (as the talent content inset does under the grid).
+local function darkenInset(inset)
+	if not inset then return end
+	for _, key in ipairs(INSET_BORDER) do
+		local r = inset[key]
+		if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
+	end
+	if inset.Bgs then
+		inset.Bgs:Show()
+		inset.Bgs:SetHorizTile(false)
+		inset.Bgs:SetVertTile(false)
+		inset.Bgs:SetTexture("Interface\\Buttons\\WHITE8X8")
+		inset.Bgs:SetVertexColor(0, 0, 0, 0.6)
+	end
+end
+
 -- Blank every Texture region a frame owns (leaves child frames / fontstrings alone).
 local function blankTextureRegions(frame)
 	if not frame or not frame.GetRegions then return end
 	for _, r in ipairs({ frame:GetRegions() }) do
-		if r.GetObjectType and r:GetObjectType() == "Texture" then
-			r:SetAlpha(0)
-		end
+		if r.GetObjectType and r:GetObjectType() == "Texture" then r:SetAlpha(0) end
 	end
 end
 
 -- Hide rock/marble background textures on a frame by texture path (keeps the rest,
--- e.g. the glyph parchment).
+-- e.g. the glyph parchment) — for frames whose bg is an unnamed runtime texture.
 local function hideRockRegions(frame)
 	if not frame or not frame.GetRegions then return end
 	for _, r in ipairs({ frame:GetRegions() }) do
@@ -53,21 +84,10 @@ local function hideRockRegions(frame)
 	end
 end
 
--- Hide the marble border pieces of an InsetFrameTemplate.
-local function hideInsetBorder(inset)
-	if not inset then return end
-	for _, key in ipairs(INSET_BORDER) do
-		local r = inset[key]
-		if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
-	end
-end
-
 S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function()
 	if not E.private.skins.blizzard.enable or not E.private.skins.blizzard.inspect then return end
 
-	-- =========================================================================
-	-- Main window frame + backdrop (one-time)
-	-- =========================================================================
+	-- ===================== main window frame (once) =====================
 	InspectFrame:StripTextures(true)
 	InspectFrame:CreateBackdrop("Transparent")
 	InspectFrame.backdrop:Point("TOPLEFT", 2, -2)
@@ -76,20 +96,17 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 	S:SetUIPanelWindowInfo(InspectFrame, "width")
 	S:SetBackdropHitRect(InspectFrame)
 
-	-- Flatten the MetalFrame2X chrome (border + corner ring + spec/ring icon +
-	-- redbutton2x close). The server re-textures the ring portrait on every
-	-- show/unit-change, so re-flatten on those events.
+	-- MetalFrame2X chrome (border + corner ring + ring/spec icon + close). The
+	-- server re-textures the ring on show/unit-change, so re-flatten on that.
 	local function FlattenChrome()
-		if S.HandleMetalFrame then
-			S:HandleMetalFrame(InspectFrame, InspectFrame.backdrop)
-		end
+		if S.HandleMetalFrame then S:HandleMetalFrame(InspectFrame, InspectFrame.backdrop) end
 	end
 	FlattenChrome()
 	if _G.InspectFrame_UpdateRingPortrait then
 		hooksecurefunc("InspectFrame_UpdateRingPortrait", FlattenChrome)
 	end
 
-	-- 5 NozdorFinder tabs (Character / PVP / Talents / Symbols / Runes).
+	-- 5 NozdorFinder tabs.
 	for i = 1, 5 do
 		local tab = _G["InspectFrameTab"..i]
 		if tab then
@@ -102,9 +119,7 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		end
 	end
 
-	-- =========================================================================
-	-- Paperdoll (gear) — one-time
-	-- =========================================================================
+	-- ===================== paperdoll gear (once) =====================
 	InspectPaperDollFrame:StripTextures()
 
 	local slots = {
@@ -155,10 +170,10 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 
 	S:HandleRotateButton(InspectModelRotateLeftButton)
 	S:HandleRotateButton(InspectModelRotateRightButton)
+	InspectModelRotateLeftButton:Point("TOPLEFT", 4, -4)
+	InspectModelRotateRightButton:Point("TOPLEFT", InspectModelRotateLeftButton, "TOPRIGHT", 3, 0)
 
-	-- =========================================================================
-	-- PVP — one-time
-	-- =========================================================================
+	-- ===================== PVP (once) =====================
 	InspectPVPFrame:StripTextures()
 	for i = 1, MAX_ARENA_TEAMS do
 		local frame = _G["InspectPVPTeam"..i]
@@ -171,75 +186,57 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		end
 	end
 
-	-- =========================================================================
-	-- Per-tab skinning (re-applied on every tab switch / show)
-	-- =========================================================================
+	-- ===================== per-tab background/inset removal =====================
+	-- Applied on every tab switch/show, because the server (re)builds each tab's
+	-- rock bg + inset when it is shown.
 
-	-- Talents: three grid columns wrapped in InsetFrameTemplate (marble border +
-	-- tree art) + rock bg + content inset — same as the player. Flat dark panels.
-	local function SkinInspectGridColumns()
+	local function SkinPaperDoll()
+		hide(_G.InspectPaperDollRockBg)
+		hide(_G.InspectPaperDollHeaderRock)
+		hide(_G.InspectPaperDollTopTileStreaks)
+		flattenInset(_G.InspectPaperDollInset)
+	end
+
+	local function SkinPVP()
+		if InspectPVPFrame then
+			hide(InspectPVPFrame.RockBg)
+			hide(InspectPVPFrame.TopTileStreaks)
+		end
+		flattenInset(_G.InspectPVPInset)
+	end
+
+	-- Talents: rock+streak are unnamed runtime textures on InspectTalentFrame; the
+	-- server already hid the frame's other regions once. Flatten each grid column
+	-- inset (marble around each tree) and blank the tree art, and darken the
+	-- content inset (which sits BELOW the grid, so this never covers the icons).
+	local function SkinTalentGrid()
 		for c = 1, 3 do
-			local inset = _G["InspectTalentFrameGridColumn"..c.."Inset"]
-			if inset then
-				hideInsetBorder(inset)
-				if inset.Bgs then
-					inset.Bgs:Show()
-					inset.Bgs:SetHorizTile(false)
-					inset.Bgs:SetVertTile(false)
-					inset.Bgs:SetTexture("Interface\\Buttons\\WHITE8X8")
-					inset.Bgs:SetVertexColor(0, 0, 0, 0.6)
-				end
-			end
+			flattenInset(_G["InspectTalentFrameGridColumn"..c.."Inset"])
 			for _, sfx in ipairs(GRID_BG_SUFFIX) do
-				local bg = _G["InspectTalentFrameGridColumn"..c..sfx]
-				if bg then bg:SetTexture(nil); bg:SetAlpha(0) end
+				hide(_G["InspectTalentFrameGridColumn"..c..sfx])
 			end
 		end
 	end
-
-	local function CleanInspectTalentInset(inset)
-		if not inset or not inset.GetRegions then return end
-		for _, r in ipairs({ inset:GetRegions() }) do
-			if r.GetObjectType and r:GetObjectType() == "Texture" then
-				r:SetTexture(nil)
-				r:SetAlpha(0)
-				-- server re-shows marble on tab switch; noop the setters.
-				r.SetTexture = E.noop
-				r.SetAlpha = E.noop
-				r.Show = E.noop
-			end
-		end
-	end
-
-	local function SkinInspectTalents()
+	local function SkinTalents()
 		local frame = _G.InspectTalentFrame
 		if not frame then return end
-		frame:StripTextures()
 		hideRockRegions(frame)
-		CleanInspectTalentInset(frame.contentInset or _G.InspectTalentFrameContentInset)
-		SkinInspectGridColumns()
+		darkenInset(frame.contentInset or _G.InspectTalentFrameContentInset)
+		SkinTalentGrid()
 	end
 
-	-- Glyphs: keep the server glyph-bg parchment + sockets; flatten the content
-	-- inset marble/rock and make the parchment semi-transparent (like the player).
-	local function SkinInspectGlyphs()
+	-- Glyphs: keep the server glyph-bg parchment (semi-transparent, like the player
+	-- glyph view); flatten the content inset + rock.
+	local function SkinGlyphs()
 		local frame = _G.InspectGlyphFrame
 		if not frame then return end
 		hideRockRegions(frame)
-		local inset = frame.contentInset or _G.InspectGlyphFrameContentInset
-		if inset then
-			hideInsetBorder(inset)
-			if inset.Bgs then inset.Bgs:SetAlpha(0) end
-		end
-		if _G.InspectGlyphFrameBackground then
-			_G.InspectGlyphFrameBackground:SetAlpha(0.6)
-		end
+		flattenInset(frame.contentInset or _G.InspectGlyphFrameContentInset)
+		if _G.InspectGlyphFrameBackground then _G.InspectGlyphFrameBackground:SetAlpha(0.6) end
 	end
 
-	-- Runes: native circle (InspectUlduarSecretsFrame) is left alone; only flatten
-	-- the host chrome (blank all RuneHost regions incl. leftover metal corners,
-	-- hide its stray close button).
-	local function SkinInspectRunes()
+	-- Runes: native circle untouched; just blank the host chrome.
+	local function SkinRunes()
 		local host = _G.InspectRuneFrameHost
 		if not host then return end
 		blankTextureRegions(host)
@@ -247,20 +244,20 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 	end
 
 	local function SkinCurrentTab()
-		SkinInspectTalents()
-		SkinInspectGlyphs()
-		SkinInspectRunes()
+		SkinPaperDoll()
+		SkinPVP()
+		SkinTalents()
+		SkinGlyphs()
+		SkinRunes()
 		FlattenChrome()
 	end
 	SkinCurrentTab()
 
-	-- Grid insets are (re)built lazily by the shared base — catch them there too.
 	if _G.TalentFrame_ApplyColumnInsets then
 		hooksecurefunc("TalentFrame_ApplyColumnInsets", function(tf)
-			if tf == _G.InspectTalentFrame then SkinInspectGridColumns() end
+			if tf == _G.InspectTalentFrame then SkinTalentGrid() end
 		end)
 	end
-	-- Re-skin after every tab switch and on show (the full inspect UI flow).
 	if _G.InspectSwitchTabs then
 		hooksecurefunc("InspectSwitchTabs", SkinCurrentTab)
 	end
@@ -268,17 +265,13 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		hooksecurefunc("InspectFrame_OnShow", SkinCurrentTab)
 	end
 
-	-- =========================================================================
-	-- Average item level readout — one-time
-	-- =========================================================================
+	-- ===================== average item level (once) =====================
 	local InspectILvl = InspectPaperDollFrame:CreateFontString(nil, "OVERLAY")
 	InspectILvl:FontTemplate(E.LSM:Fetch("font", E.db.general.font), 21, "OUTLINE")
 	InspectILvl:Point("TOPLEFT", InspectModelFrame, "BOTTOMLEFT", 100, 50)
 	InspectILvl:SetText("—")
 
-	local INSPECT_SLOT_IDS = {
-		1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18,
-	}
+	local INSPECT_SLOT_IDS = { 1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18 }
 	local function ColorByILvl(ilvl)
 		if ilvl <= 190 then
 			return GetItemQualityColor(2)
