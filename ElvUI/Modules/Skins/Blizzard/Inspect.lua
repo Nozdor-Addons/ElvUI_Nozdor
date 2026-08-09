@@ -319,60 +319,6 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		end
 	end
 
-	-- ===================== average item level (once) =====================
-	local InspectILvl = InspectPaperDollFrame:CreateFontString(nil, "OVERLAY")
-	InspectILvl:FontTemplate(E.LSM:Fetch("font", E.db.general.font), 21, "OUTLINE")
-	InspectILvl:Point("TOPLEFT", InspectModelFrame, "BOTTOMLEFT", 100, 50)
-	InspectILvl:SetText("—")
-
-	local INSPECT_SLOT_IDS = { 1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18 }
-	local function ColorByILvl(ilvl)
-		if ilvl <= 190 then
-			return GetItemQualityColor(2)
-		elseif ilvl <= 200 then
-			return GetItemQualityColor(3)
-		else
-			return GetItemQualityColor(4)
-		end
-	end
-	local function UpdateInspectAverage()
-		if not InspectFrame or not InspectFrame.unit or not InspectFrame:IsShown() then return end
-		local unit = InspectFrame.unit
-		local total, count, needsRetry = 0, 0, false
-		for _, slotID in ipairs(INSPECT_SLOT_IDS) do
-			local link = GetInventoryItemLink(unit, slotID)
-			if link then
-				local _, _, _, ilvl = GetItemInfo(link)
-				if not ilvl then
-					needsRetry = true
-				elseif ilvl > 0 then
-					total = total + ilvl
-					count = count + 1
-				end
-			end
-		end
-		if needsRetry then
-			E:Delay(0.1, UpdateInspectAverage)
-			return
-		end
-		if count > 0 then
-			local rounded = floor(total / count + 0.5)
-			InspectILvl:SetFormattedText("%d", rounded)
-			InspectILvl:SetTextColor(ColorByILvl(rounded))
-		else
-			InspectILvl:SetText("—")
-			InspectILvl:SetTextColor(1, 1, 1)
-		end
-	end
-
-	InspectFrame:HookScript("OnShow", UpdateInspectAverage)
-	hooksecurefunc("InspectPaperDollItemSlotButton_Update", function()
-		if InspectFrame:IsShown() then UpdateInspectAverage() end
-	end)
-
-	local InspectILvlEvent = CreateFrame("Frame")
-	InspectILvlEvent:RegisterEvent("INSPECT_READY")
-	InspectILvlEvent:SetScript("OnEvent", function()
-		if InspectFrame:IsShown() then UpdateInspectAverage() end
-	end)
+	-- Average item level is drawn by the server's own redesigned inspect window
+	-- (ItemLevelMixIn); an ElvUI copy here duplicated the number, so it's not added.
 end)
