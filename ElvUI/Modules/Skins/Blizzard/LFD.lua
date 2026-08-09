@@ -558,16 +558,12 @@ do
 			"HK_LFDSidebarBracket2v2Btn", "HK_LFDSidebarBracket3v3Btn",
 			"HK_LFDSidebarBracketRbgBtn",
 		}
-		-- Select/hover on a sidebar button, driven by the ElvUI backdrop border:
-		-- accent when the tab is active (server sets btn._hkActive in setSidebarTabState)
-		-- or hovered, dark otherwise.
-		local function sidebarBorder(b, hover)
+		-- Selected sidebar tab = accent border (server sets btn._hkActive in
+		-- setSidebarTabState). Hover = a translucent accent fill on the HIGHLIGHT layer
+		-- (ElvUI's list-row idiom), which WoW shows automatically on mouseover.
+		local function sidebarSelect(b)
 			if not b.backdrop then return end
-			if b._hkActive or hover then
-				b.backdrop:SetBackdropBorderColor(unpack(E.media.rgbvaluecolor))
-			else
-				b.backdrop:SetBackdropBorderColor(unpack(E.media.bordercolor))
-			end
+			b.backdrop:SetBackdropBorderColor(unpack(b._hkActive and E.media.rgbvaluecolor or E.media.bordercolor))
 		end
 		local function SkinSidebarButtons()
 			for _, n in ipairs(SIDEBAR_BTNS) do
@@ -580,14 +576,18 @@ do
 							b.backdrop:SetFrameLevel(math.max(0, (b:GetFrameLevel() or 1) - 1))
 						end
 					end
-					-- Replace the server's own selection art with the ElvUI border accent.
+					-- Replace the server's own selection art with the ElvUI accents.
 					if b.selection and b.selection.SetAlpha then b.selection:SetAlpha(0) end
-					if not b.__euiHover and b.HookScript then
-						b.__euiHover = true
-						b:HookScript("OnEnter", function(self) sidebarBorder(self, true) end)
-						b:HookScript("OnLeave", function(self) sidebarBorder(self, false) end)
+					if not b.__euiHL and b.backdrop then
+						b.__euiHL = true
+						-- Drop the server's native highlight so only the ElvUI fill shows.
+						if b.SetHighlightTexture then b:SetHighlightTexture("") end
+						local hl = b:CreateTexture(nil, "HIGHLIGHT")
+						hl:SetTexture(E.Media.Textures.Highlight)
+						hl:SetVertexColor(E.media.rgbvaluecolor[1], E.media.rgbvaluecolor[2], E.media.rgbvaluecolor[3], 0.35)
+						hl:SetInside(b.backdrop)
 					end
-					sidebarBorder(b, false)
+					sidebarSelect(b)
 				end
 			end
 		end
