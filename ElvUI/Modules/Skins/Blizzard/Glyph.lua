@@ -96,13 +96,30 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 		end
 	end
 
+	-- InsetFrameTemplate marble border pieces (parentKeys) — hide them to drop the
+	-- stock _UI-Frame frame around an inset.
+	local INSET_BORDER = {
+		"InsetBorderTopLeft", "InsetBorderTopRight",
+		"InsetBorderBottomLeft", "InsetBorderBottomRight",
+		"InsetBorderTop", "InsetBorderBottom", "InsetBorderLeft", "InsetBorderRight",
+	}
+	local function HideInsetBorder(inset)
+		if not inset then return end
+		for _, key in ipairs(INSET_BORDER) do
+			local r = inset[key]
+			if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
+		end
+	end
+
 	local function SkinGlyphSidebar()
 		local pt = _G.PlayerTalentFrame
 		local ci2 = pt and pt.contentInset2
 		if not ci2 then return end
 
-		-- Parchment side background -> flat ElvUI backdrop.
+		-- The right panel (contentInset2) is itself an InsetFrameTemplate: blank its
+		-- parchment side-bg AND hide its marble border pieces, then flat backdrop.
 		if ci2.Bgs then ci2.Bgs:SetTexture(nil); ci2.Bgs:SetAlpha(0) end
+		HideInsetBorder(ci2)
 		if not ci2.__euiBackdrop then
 			ci2.__euiBackdrop = true
 			ci2:CreateBackdrop("Transparent")
@@ -127,6 +144,7 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 		if scroll and not scroll.__euiSkinned then
 			scroll.__euiSkinned = true
 			local border = scroll:GetParent()
+			HideInsetBorder(border)
 			BlankTextures(border)
 			if border and not border.__euiBackdrop then
 				border.__euiBackdrop = true
