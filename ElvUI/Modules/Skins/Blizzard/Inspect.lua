@@ -32,6 +32,16 @@ local function hide(obj)
 	if obj and obj.SetAlpha then obj:SetAlpha(0) end
 end
 
+-- Turn a texture region into a flat dark fill (reuse an existing bg texture).
+local function darkenTex(tex, alpha)
+	if not tex then return end
+	tex:Show()
+	if tex.SetHorizTile then tex:SetHorizTile(false) end
+	if tex.SetVertTile then tex:SetVertTile(false) end
+	tex:SetTexture("Interface\\Buttons\\WHITE8X8")
+	tex:SetVertexColor(0, 0, 0, alpha or 0.6)
+end
+
 -- Flatten an InsetFrameTemplate: hide its marble Bgs + the 8 border pieces.
 local function flattenInset(inset)
 	if not inset then return end
@@ -100,6 +110,11 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 	-- server re-textures the ring on show/unit-change, so re-flatten on that.
 	local function FlattenChrome()
 		if S.HandleMetalFrame then S:HandleMetalFrame(InspectFrame, InspectFrame.backdrop) end
+		-- Portrait(s): HandleMetalFrame hides ringPortrait/specRingIcon, but the
+		-- stock InspectFramePortrait can still show — hide it too.
+		hide(_G.InspectFramePortrait)
+		if InspectFrame.portrait then hide(InspectFrame.portrait) end
+		if InspectFrame.ringPortrait then InspectFrame.ringPortrait:Hide() end
 	end
 	FlattenChrome()
 	if _G.InspectFrame_UpdateRingPortrait then
@@ -131,6 +146,13 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		hide(_G.InspectPaperDollHeaderRock)
 		hide(_G.InspectPaperDollTopTileStreaks)
 		flattenInset(_G.InspectPaperDollInset)
+		-- Model scene under the character (DressUp-<Race> quadrants + overlay) — hide
+		-- it like the player character frame so the model sits on the flat backdrop.
+		hide(_G.InspectModelFrameBgTopLeft)
+		hide(_G.InspectModelFrameBgTopRight)
+		hide(_G.InspectModelFrameBgBotLeft)
+		hide(_G.InspectModelFrameBgBotRight)
+		hide(_G.InspectModelFrameBgOverlay)
 	end
 
 	local function SkinPVP()
@@ -138,16 +160,24 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 			hide(InspectPVPFrame.RockBg)
 			hide(InspectPVPFrame.TopTileStreaks)
 		end
-		flattenInset(_G.InspectPVPInset)
+		local inset = _G.InspectPVPInset
+		if inset then
+			for _, key in ipairs(INSET_BORDER) do
+				local r = inset[key]
+				if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
+			end
+			-- This inset's fill is a pvp-conquest art texture on parentKey .Bg (not
+			-- .Bgs). Reuse it as a strong dark area (darker than the normal bg).
+			darkenTex(inset.Bg or inset.Bgs, 0.75)
+		end
 	end
 
-	-- Talents: rock+streak are unnamed runtime textures on InspectTalentFrame; the
-	-- server already hid the frame's other regions once. Flatten each grid column
-	-- inset (marble around each tree) and blank the tree art, and darken the
-	-- content inset (which sits BELOW the grid, so this never covers the icons).
+	-- Talents: mirror the player — dark panel PER COLUMN (reuse each column inset's
+	-- Bgs as the dark fill, hide its marble border, blank the tree art). The grid
+	-- buttons draw above the column inset, so this doesn't cover the icons.
 	local function SkinTalentGrid()
 		for c = 1, 3 do
-			flattenInset(_G["InspectTalentFrameGridColumn"..c.."Inset"])
+			darkenInset(_G["InspectTalentFrameGridColumn"..c.."Inset"])
 			for _, sfx in ipairs(GRID_BG_SUFFIX) do
 				hide(_G["InspectTalentFrameGridColumn"..c..sfx])
 			end
@@ -157,7 +187,9 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		local frame = _G.InspectTalentFrame
 		if not frame then return end
 		hideRockRegions(frame)
-		darkenInset(frame.contentInset or _G.InspectTalentFrameContentInset)
+		-- Content inset sits under the whole grid — just flatten it (columns provide
+		-- the dark), like the player talent content inset.
+		flattenInset(frame.contentInset or _G.InspectTalentFrameContentInset)
 		SkinTalentGrid()
 	end
 
@@ -247,16 +279,11 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 	end
 	hooksecurefunc("InspectPaperDollItemSlotButton_Update", styleButton)
 
-	-- Rotate arrows: HandleRotateButton assumes a NormalTexture and would throw on
-	-- the server's custom arrows (nil texture) — which used to abort this whole
-	-- callback. Guard it.
-	local function SkinRotate(btn)
-		if btn and btn.GetNormalTexture and btn:GetNormalTexture() then
-			S:HandleRotateButton(btn)
-		end
-	end
-	SkinRotate(_G.InspectModelRotateLeftButton)
-	SkinRotate(_G.InspectModelRotateRightButton)
+	-- Rotate arrows: the server's custom arrows have no NormalTexture, so
+	-- HandleRotateButton throws on them (it assumes one). Use HandleButton instead —
+	-- the same fix used for the pet-model rotate arrows on the character frame.
+	if _G.InspectModelRotateLeftButton then S:HandleButton(InspectModelRotateLeftButton) end
+	if _G.InspectModelRotateRightButton then S:HandleButton(InspectModelRotateRightButton) end
 
 	-- ===================== PVP (once) =====================
 	if _G.InspectPVPFrame then InspectPVPFrame:StripTextures() end
