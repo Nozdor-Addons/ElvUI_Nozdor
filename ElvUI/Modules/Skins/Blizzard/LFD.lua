@@ -240,3 +240,124 @@ S:AddCallback("Skin_LFD", function()
 		end
 	end)
 end)
+-- =====================================================================
+-- NOZDOR "Finder" redesign (LFDParentFrame inherits MetalFrame2X natively;
+-- the HK_LFDShell re-decorates on every view switch). Applied as its own
+-- callback so a crash in the stock LFD skin above can't block it.
+-- Pass 1: tabs + PVE (Dungeons) view — flatten chrome/ring/eye, remove the
+-- rock/heroic/blue backgrounds + insets, skin the dropdown.
+-- =====================================================================
+do
+	local _G = _G
+	local ipairs = ipairs
+	local hooksecurefunc = hooksecurefunc
+
+	local INSET_BORDER = {
+		"InsetBorderTopLeft", "InsetBorderTopRight",
+		"InsetBorderBottomLeft", "InsetBorderBottomRight",
+		"InsetBorderTop", "InsetBorderBottom", "InsetBorderLeft", "InsetBorderRight",
+	}
+
+	local function hide(obj)
+		if obj and obj.SetAlpha then obj:SetAlpha(0) end
+	end
+	local function flattenInset(inset)
+		if not inset then return end
+		for _, key in ipairs(INSET_BORDER) do
+			local r = inset[key]
+			if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
+		end
+		if inset.Bgs then inset.Bgs:SetAlpha(0) end
+	end
+	local function blankTextureRegions(frame)
+		if not frame or not frame.GetRegions then return end
+		for _, r in ipairs({ frame:GetRegions() }) do
+			if r.GetObjectType and r:GetObjectType() == "Texture" then r:SetAlpha(0) end
+		end
+	end
+
+	S:AddCallback("Skin_LFD_Nozdor", function()
+		if not E.private.skins.blizzard.enable or not E.private.skins.blizzard.lfd then return end
+		local frame = _G.LFDParentFrame
+		-- Only the redesigned finder (native MetalFrame2X + HK shell).
+		if not frame or not _G.HK_LFDShell_SetTab then return end
+
+		-- Flat window backdrop.
+		if not frame.backdrop then
+			frame:CreateBackdrop("Transparent")
+			frame.backdrop:Point("TOPLEFT", 2, -2)
+			frame.backdrop:Point("BOTTOMRIGHT", -2, 2)
+			S:SetBackdropHitRect(frame)
+		end
+
+		-- Chrome: metal border + corner ring + close; hide the eye/ring portrait.
+		local function FlattenChrome()
+			if S.HandleMetalFrame then S:HandleMetalFrame(frame, frame.backdrop) end
+			hide(_G.LFDParentFramePortrait)
+			if _G.HK_LFDPortraitFrame then _G.HK_LFDPortraitFrame:Hide() end
+		end
+
+		-- Backgrounds (rock / heroic / blue role strip / sidebar) + all HK insets.
+		local INSET_NAMES = {
+			"HK_LFDDescInset", "HK_LFDDescInsetCategoryInset",
+		}
+		local function FlattenBackgrounds()
+			-- Full-window rock bg (runtime child frame HK_LFDRockBg with .rock).
+			local rock = _G.HK_LFDRockBg
+			if rock then
+				if rock.rock then hide(rock.rock) end
+				blankTextureRegions(rock)
+			end
+			-- Heroic description bg + role-strip blue bg.
+			if _G.HK_LFDDescHeroicBg then hide(_G.HK_LFDDescHeroicBg.HeroicBg) end
+			if _G.HK_LFDRoleInset then hide(_G.HK_LFDRoleInset.BlueBg) end
+			-- Sidebar chrome (blue menu bg + corners).
+			if _G.HK_LFDSidebarBg then blankTextureRegions(_G.HK_LFDSidebarBg) end
+			hide(_G.HK_LFDSidebarBgBlueBg)
+			-- Stock questpaper bg.
+			hide(_G.LFDQueueFrameBackground)
+			-- Flatten the named InsetFrameTemplate insets.
+			for _, n in ipairs(INSET_NAMES) do flattenInset(_G[n]) end
+			flattenInset(_G.HK_LFDRoleInset)
+		end
+
+		-- Dropdown (dungeon/role selection).
+		local function SkinDropdowns()
+			local dd = _G.LFDQueueFrameTypeDropDown
+			if dd and not dd.__euiSkinned then
+				dd.__euiSkinned = true
+				if S.HandleDropDownBox then S:HandleDropDownBox(dd) end
+			end
+		end
+
+		-- Top tabs (Dungeons / PvP / Stats / Gear / Keys).
+		local TOP_TABS = {
+			"HK_LFDTopTabDungeons", "HK_LFDTopTabPvp", "HK_LFDTopTabStats",
+			"HK_LFDTopTabGear", "HK_LFDTopTabKeys",
+		}
+		local function SkinTabs()
+			for _, n in ipairs(TOP_TABS) do
+				local tab = _G[n]
+				if tab and not tab.__euiSkinned then
+					tab.__euiSkinned = true
+					if tab.bg then tab.bg:SetAlpha(0) end
+					if tab.selection then tab.selection:SetAlpha(0) end
+					if S.HandleTab then S:HandleTab(tab) end
+				end
+			end
+		end
+
+		local function SkinAll()
+			FlattenChrome()
+			FlattenBackgrounds()
+			SkinDropdowns()
+			SkinTabs()
+		end
+		SkinAll()
+
+		if _G.HK_LFDShell_SetTab then
+			hooksecurefunc("HK_LFDShell_SetTab", SkinAll)
+		end
+		frame:HookScript("OnShow", SkinAll)
+	end)
+end
