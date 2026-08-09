@@ -15,7 +15,7 @@ local GetInventoryItemLink = GetInventoryItemLink
 local CreateFrame = CreateFrame
 local floor = math.floor
 
--- ==== base helpers (remove insets + backgrounds, the way the player windows do) ==
+-- base helpers: remove insets + backgrounds, as the player windows do.
 
 -- InsetFrameTemplate marble border pieces (parentKeys).
 local INSET_BORDER = {
@@ -77,8 +77,8 @@ local function blankTextureRegions(frame)
 	end
 end
 
--- Hide rock/marble background textures on a frame by texture path (keeps the rest,
--- e.g. the glyph parchment) — for frames whose bg is an unnamed runtime texture.
+-- Hide rock/marble bg textures by texture path (keeps the rest, e.g. the parchment) —
+-- for frames whose bg is an unnamed runtime texture.
 local function hideRockRegions(frame)
 	if not frame or not frame.GetRegions then return end
 	for _, r in ipairs({ frame:GetRegions() }) do
@@ -97,7 +97,7 @@ end
 S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function()
 	if not E.private.skins.blizzard.enable or not E.private.skins.blizzard.inspect then return end
 
-	-- ===================== main window frame (once) =====================
+	-- main window frame (once)
 	InspectFrame:StripTextures(true)
 	InspectFrame:CreateBackdrop("Transparent")
 	InspectFrame.backdrop:Point("TOPLEFT", 2, -2)
@@ -106,13 +106,11 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 	S:SetUIPanelWindowInfo(InspectFrame, "width")
 	S:SetBackdropHitRect(InspectFrame)
 
-	-- MetalFrame2X chrome (border + corner ring + ring/spec icon + close). The
-	-- server re-textures the ring on show/unit-change, so re-flatten on that.
+	-- The server re-textures the ring on show/unit-change, so re-flatten on that.
 	local function FlattenChrome()
 		if S.HandleMetalFrame then S:HandleMetalFrame(InspectFrame, InspectFrame.backdrop) end
-		-- Portrait(s): HandleMetalFrame hides ringPortrait/specRingIcon, but the stock
-		-- portrait texture AND the 3D portrait model (InspectFramePortraitModel, a
-		-- PlayerModel parented to InspectFrame) still show — hide them too.
+		-- HandleMetalFrame hides ringPortrait/specRingIcon, but the stock portrait texture
+		-- and the 3D portrait model still show — hide them too.
 		hide(_G.InspectFramePortrait)
 		if _G.InspectFramePortraitModel then _G.InspectFramePortraitModel:Hide() end
 		if _G.InspectFramePortraitModelModel then _G.InspectFramePortraitModelModel:Hide() end
@@ -138,21 +136,17 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		end
 	end
 
-	-- ===================== per-tab background/inset removal =====================
-	-- IMPORTANT: this block (and its hooks) is set up BEFORE the one-time
-	-- paperdoll/rotate/PVP styling, because that styling can throw on the server's
-	-- redesigned widgets (e.g. custom rotate arrows with no NormalTexture) and a
-	-- throw would abort the whole callback — which is why the inspect window
-	-- previously "never changed". Applied on every tab switch/show.
-
+	-- per-tab background/inset removal. IMPORTANT: set up BEFORE the one-time
+	-- paperdoll/rotate/PVP styling, since that styling can throw on the server's
+	-- redesigned widgets and a throw would abort the whole callback (why the inspect
+	-- window previously "never changed"). Applied on every tab switch/show.
 	local function SkinPaperDoll()
 		hide(_G.InspectPaperDollRockBg)
 		hide(_G.InspectPaperDollHeaderRock)
 		hide(_G.InspectPaperDollTopTileStreaks)
 		hide(_G.InspectBottomDivider)
 		flattenInset(_G.InspectPaperDollInset)
-		-- Model scene under the character (DressUp-<Race> quadrants + overlay) — hide
-		-- it like the player character frame so the model sits on the flat backdrop.
+		-- Model scene quadrants + overlay — hide so the model sits on the flat backdrop.
 		hide(_G.InspectModelFrameBgTopLeft)
 		hide(_G.InspectModelFrameBgTopRight)
 		hide(_G.InspectModelFrameBgBotLeft)
@@ -175,26 +169,23 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 				local r = inset[key]
 				if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
 			end
-			-- This inset's fill is a pvp-conquest art texture on parentKey .Bg (not
-			-- .Bgs). Hide the default marble Bgs behind it, then reuse .Bg as a strong
-			-- dark area (darker than the normal bg).
+			-- This inset's fill is pvp-conquest art on parentKey .Bg (not .Bgs); hide the
+			-- marble Bgs behind it, then reuse .Bg as a strong dark fill.
 			hide(inset.Bgs)
 			darkenTex(inset.Bg or inset.Bgs, 0.75)
 		end
 	end
 
-	-- Talents: mirror the player — dark panel PER COLUMN (reuse each column inset's
-	-- Bgs as the dark fill, hide its marble border, blank the tree art). The grid
-	-- buttons draw above the column inset, so this doesn't cover the icons.
+	-- Talents: dark panel per column (reuse each column inset's Bgs as the dark fill).
+	-- Grid buttons draw above the inset, so this doesn't cover the icons.
 	local function SkinTalentGrid()
 		for c = 1, 3 do
 			local col = _G["InspectTalentFrameGridColumn"..c]
 			local inset = _G["InspectTalentFrameGridColumn"..c.."Inset"]
 			if inset then
 				darkenInset(inset)
-				-- The column inset is created after the talent buttons, so its dark
-				-- fill draws over them ("everything dark"). Push the inset below the
-				-- column content so the talent icons sit above the dark panel.
+				-- Inset is created after the talent buttons, so its dark fill draws over
+				-- them; push it below the column content so the icons sit above.
 				if col then
 					inset:SetFrameLevel(math.max((col:GetFrameLevel() or 1) - 1, 0))
 				end
@@ -208,8 +199,7 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		local frame = _G.InspectTalentFrame
 		if not frame then return end
 		hideRockRegions(frame)
-		-- Content inset sits under the whole grid — just flatten it (columns provide
-		-- the dark), like the player talent content inset.
+		-- Content inset sits under the whole grid — just flatten it (columns provide the dark).
 		flattenInset(frame.contentInset or _G.InspectTalentFrameContentInset)
 		SkinTalentGrid()
 	end
@@ -251,7 +241,7 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		hooksecurefunc("InspectFrame_OnShow", SkinCurrentTab)
 	end
 
-	-- ===================== paperdoll gear (once) =====================
+	-- paperdoll gear (once)
 	InspectPaperDollFrame:StripTextures()
 
 	local slots = {
@@ -300,13 +290,12 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 	end
 	hooksecurefunc("InspectPaperDollItemSlotButton_Update", styleButton)
 
-	-- Rotate arrows: the server's custom arrows have no NormalTexture, so
-	-- HandleRotateButton throws on them (it assumes one). Use HandleButton instead —
-	-- the same fix used for the pet-model rotate arrows on the character frame.
+	-- Rotate arrows: the server's custom arrows have no NormalTexture, so HandleRotateButton
+	-- throws; use HandleButton instead (same fix as the character pet-model arrows).
 	if _G.InspectModelRotateLeftButton then S:HandleButton(InspectModelRotateLeftButton) end
 	if _G.InspectModelRotateRightButton then S:HandleButton(InspectModelRotateRightButton) end
 
-	-- ===================== PVP (once) =====================
+	-- PVP (once)
 	if _G.InspectPVPFrame then InspectPVPFrame:StripTextures() end
 	for i = 1, (MAX_ARENA_TEAMS or 0) do
 		local frame = _G["InspectPVPTeam"..i]

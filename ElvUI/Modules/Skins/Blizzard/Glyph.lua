@@ -7,10 +7,9 @@ local unpack = unpack
 local type = type
 local ipairs = ipairs
 
--- Bulletproof dropdown arrow (same fix as the finder): the server re-applies its
--- common-dropdown-a-button texture on hover, and HandleDropDownBox early-returns on
--- an existing backdrop, so the stock Blizzard arrow keeps flashing back. Kill and
--- FREEZE the button's own textures and draw our own ElvUI arrow the server can't touch.
+-- Dropdown arrow (same fix as the finder): the server re-applies its arrow texture on
+-- hover and HandleDropDownBox early-returns on an existing backdrop, so freeze the
+-- button's own textures and draw our own ElvUI arrow the server can't touch.
 local function skinDropArrow(btn)
 	if not btn or btn.__euiArrow then return end
 	btn.__euiArrow = true
@@ -27,7 +26,7 @@ local function skinDropArrow(btn)
 	btn.SetDisabledTexture = E.noop
 	local a = btn:CreateTexture(nil, "OVERLAY")
 	a:SetTexture(E.Media.Textures.ArrowUp)
-	a:SetRotation(S.ArrowRotation and S.ArrowRotation.down or 3.14) -- point down
+	a:SetRotation(S.ArrowRotation and S.ArrowRotation.down or 3.14)
 	a:SetSize(12, 12)
 	a:SetPoint("CENTER", btn, "CENTER", 0, 0)
 	a:SetVertexColor(1, 1, 1)
@@ -40,12 +39,9 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 		TalentFrame_LoadUI()
 	end
 
-	-- Do NOT StripTextures the GlyphFrame: on this server GlyphFrame's only regions
-	-- are the parchment (GlyphFrameBackground = glyph-bg) and the socket glow, both
-	-- of which we want to keep. StripTextures would blank the parchment, and since
-	-- we no longer re-set it (the server owns the parchment now), the glyph view
-	-- would have no background at all. The ElvUI backdrop below is faded out while
-	-- the glyph tab is open, so it never covers the parchment.
+	-- Do NOT StripTextures the GlyphFrame: its only regions are the server-owned
+	-- parchment (GlyphFrameBackground) and socket glow, both kept. The ElvUI backdrop
+	-- below is faded out while the glyph tab is open, so it never covers the parchment.
 
 	if not GlyphFrame.backdrop then
 		GlyphFrame:CreateBackdrop("Transparent")
@@ -55,12 +51,8 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	GlyphFrame.backdrop:Point("BOTTOMRIGHT", -32, 76)
 	S:SetBackdropHitRect(GlyphFrame)
 
-	-- Base metal-frame cleanup on the shared PlayerTalentFrame: drop the metal
-	-- border + spec ring icon (reskin the close button) and hide the rock/shadow, so
-	-- the glyph view doesn't show the leftover ring/corner chrome. The glyph parchment
-	-- itself is kept below.
-	-- The glyph view has its own full-window rock base (PlayerTalentFrameGlyphRock,
-	-- stored as PlayerTalentFrame.glyphRockBase). Blank it so the flat ElvUI
+	-- Metal-frame cleanup on the shared PlayerTalentFrame, plus blank the glyph view's
+	-- own full-window rock base (PlayerTalentFrame.glyphRockBase) so the flat ElvUI
 	-- backdrop shows instead of the rock tile bleeding through.
 	local function HideGlyphRock()
 		local base = _G.PlayerTalentFrame and _G.PlayerTalentFrame.glyphRockBase
@@ -89,20 +81,11 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 	CleanTalentChrome()
 	GlyphFrame:HookScript("OnShow", CleanTalentChrome)
 
-	-- Parchment + glyph rings are OWNED BY THE SERVER now. The redesigned glyph view
-	-- draws GlyphFrameBackground (Interface\FrameGeneral\glyph-bg, ~430x408) anchored
-	-- to PlayerTalentFrame.contentInset, and positions the six glyph sockets relative
-	-- to that background (GlyphFrame_PositionSockets, tuned glyphPositions). The old
-	-- ElvUI code re-parented the parchment into its own holder, swapped it for the
-	-- Spellbook UI-GlyphFrame texture and re-laid the rings at stock offsets — which
-	-- is exactly what made the parchment look zoomed and scattered the rings. Leave
-	-- the server layout alone; we only do window chrome + the finder-panel skin.
-	-- Just make sure the rock base stays hidden as the view updates.
-	--
-	-- Also: make the parchment semi-transparent so the flat dark backdrop reads
-	-- through it, and keep the insertion glow (GlyphFrameGlow) sitting exactly over
-	-- the parchment — same rect, just above it, at the same alpha — so the two read
-	-- as one panel. The server re-anchors/re-shows both on update, so re-apply here.
+	-- Parchment + glyph rings are server-owned now (the old ElvUI code re-parented the
+	-- parchment and re-laid the rings, which is what made it look zoomed/scattered) —
+	-- leave the layout alone. Only make the parchment semi-transparent so the dark
+	-- backdrop reads through, and keep the glow over it as one panel. Server re-anchors
+	-- both on update, so re-apply here.
 	local GLYPH_BG_ALPHA = 0.6
 	local function StyleGlyphParchment()
 		local bg = _G.GlyphFrameBackground
@@ -125,11 +108,8 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 		end
 	end)
 
-	-- Right-hand glyph finder panel (server custom on PlayerTalentFrame.contentInset2):
-	-- parchment side-bg, "Поиск" search box, availability dropdown, a bespoke
-	-- scrollbar and category header buttons. Reskin them to match the ElvUI window.
-	-- Rows themselves are left alone. Everything is created lazily as the list
-	-- populates, so skin after the (global) GlyphSidebar_Populate builds it.
+	-- Right-hand glyph finder panel (server custom on PlayerTalentFrame.contentInset2).
+	-- Rows are left alone. Everything is created lazily, so skin after GlyphSidebar_Populate.
 	local function BlankTextures(frame)
 		if not frame or not frame.GetRegions then return end
 		local i = 1
@@ -144,8 +124,7 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 		end
 	end
 
-	-- InsetFrameTemplate marble border pieces (parentKeys) — hide them to drop the
-	-- stock _UI-Frame frame around an inset.
+	-- InsetFrameTemplate marble border pieces (parentKeys) — hide to drop the stock frame.
 	local INSET_BORDER = {
 		"InsetBorderTopLeft", "InsetBorderTopRight",
 		"InsetBorderBottomLeft", "InsetBorderBottomRight",
@@ -164,8 +143,7 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 		local ci2 = pt and pt.contentInset2
 		if not ci2 then return end
 
-		-- The right panel (contentInset2) is itself an InsetFrameTemplate: blank its
-		-- parchment side-bg AND hide its marble border pieces, then flat backdrop.
+		-- contentInset2 is itself an InsetFrameTemplate: blank its bg + border, then backdrop.
 		if ci2.Bgs then ci2.Bgs:SetTexture(nil); ci2.Bgs:SetAlpha(0) end
 		HideInsetBorder(ci2)
 		if not ci2.__euiBackdrop then
@@ -185,10 +163,8 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 				dd.__euiSkinned = true
 				S:HandleDropDownBox(dd)
 			end
-			-- Make the whole dropdown box open the menu, not just the arrow: extend
-			-- the arrow button's hit rect left across the box width. The box spans
-			-- ~contentInset2 width, so key the extension off that (set on each
-			-- populate, since the width is applied there).
+			-- Extend the arrow button's hit rect left across the box width so the whole
+			-- box opens the menu (keyed off contentInset2 width, set on each populate).
 			local ddButton = _G.GlyphFrameAvailDropDownButton
 			local w = ci2:GetWidth()
 			if ddButton and w and w > 1 then
@@ -198,9 +174,8 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 			skinDropArrow(ddButton)
 		end
 
-		-- Bespoke scrollbar: the server drew a black rail + UI-Character-ScrollBar
-		-- art onto the list's inset border. Blank that border's textures and give
-		-- the scrollbar the ElvUI look.
+		-- Scrollbar: the server drew rail art onto the list's inset border; blank that
+		-- border's textures and give the scrollbar the ElvUI look.
 		local scroll = _G.GlyphFrameListScroll
 		if scroll and not scroll.__euiSkinned then
 			scroll.__euiSkinned = true
@@ -215,9 +190,8 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 			if sbar then S:HandleScrollBar(sbar) end
 		end
 
-		-- Category header buttons (collapsibleheader plate + "+/-"): strip the
-		-- server plate (textures only, keep the label/sign FontStrings) and give
-		-- them a flat ElvUI backdrop.
+		-- Category header buttons: strip the server plate (textures only, keep the
+		-- label/sign FontStrings) and give them a flat ElvUI backdrop.
 		local list = ci2._glyphList
 		if list and list.headers then
 			for _, h in ipairs(list.headers) do
@@ -225,9 +199,8 @@ S:AddCallbackForAddon("Blizzard_GlyphUI", "Skin_Blizzard_GlyphUI", function()
 					h.__euiSkinned = true
 					BlankTextures(h)
 					h:CreateBackdrop("Transparent")
-					-- The backdrop plate draws above the header's own OVERLAY
-					-- FontStrings; re-parent the label + collapse sign onto the
-					-- backdrop so the title text and +/- sit above the plate.
+					-- Backdrop draws above the header's OVERLAY FontStrings; re-parent the
+					-- label + collapse sign onto the backdrop so they sit above the plate.
 					if h.text then h.text:SetParent(h.backdrop) end
 					if h.sign then h.sign:SetParent(h.backdrop) end
 				end

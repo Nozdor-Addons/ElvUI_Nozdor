@@ -240,17 +240,11 @@ S:AddCallback("Skin_LFD", function()
 		end
 	end)
 end)
--- =====================================================================
--- NOZDOR "Finder" redesign (LFDParentFrame inherits MetalFrame2X natively;
--- the HK_LFDShell re-decorates on every view switch). Applied as its own
--- callback so a crash in the stock LFD skin above can't block it.
---
--- Rather than name every HK_ inset/background one by one, RECURSIVELY sweep the
--- whole finder subtree: flatten any InsetFrameTemplate (Bgs + border pieces) and
--- blank any texture whose file is a known decorative background (rock / marble /
--- blue menu / pvp queue / LFG bg / _UI-Frame inset border / questpaper). Re-run on
--- every view switch + show.
--- =====================================================================
+-- NOZDOR "Finder" redesign (LFDParentFrame inherits MetalFrame2X; the HK_LFDShell
+-- re-decorates on every view switch). Its own callback so a crash in the stock LFD
+-- skin above can't block it. Rather than name every HK_ inset one by one, RECURSIVELY
+-- sweep the finder subtree: flatten InsetFrameTemplates and blank known decorative
+-- background textures. Re-run on every view switch + show.
 do
 	local _G = _G
 	local ipairs = ipairs
@@ -263,22 +257,18 @@ do
 		"InsetBorderTop", "InsetBorderBottom", "InsetBorderLeft", "InsetBorderRight",
 	}
 
-	-- Decorative background art paths anywhere in the finder tree. Kept broad on
-	-- purpose: [_!]ui-frame catches both _UI-Frame and !UI-Frame; "bluemenu" catches
-	-- bluemenu-main AND bluemenu-goldborder-*; char-paperdoll/char-inner catch the
-	-- Blizzard divider bars. NB: "pvpqueue" is intentionally absent — in the finder
-	-- that atlas is used ONLY for content (currency rings, the season-record arrow,
-	-- the arena-points bar, the prestige ring), never for chrome, so blanking it
-	-- erased art the user wants kept.
+	-- Decorative background art paths in the finder tree, kept broad on purpose. NB:
+	-- "pvpqueue" is intentionally absent — in the finder that atlas is content (currency
+	-- rings, season-record arrow, arena-points bar, prestige ring), not chrome, so
+	-- blanking it erased art we want kept.
 	local BG_PATTERNS = {
 		"ui%-background%-rock", "ui%-background%-marble", "bluemenu",
 		"ui%-lfg%-background", "ui%-lfg%-bluebg", "ui%-frame",
 		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
 		"char%-paperdoll", "char%-inner", "%-goldborder", "common%-dropdown",
 	}
-	-- NB: "itemupgrade" is intentionally NOT a blanket pattern — the same atlas draws
-	-- the gear slot's "+" and blink icons, which must stay. The gear container's own
-	-- top/bottom art is blanked explicitly in SkinGear instead.
+	-- NB: "itemupgrade" is intentionally NOT a pattern — the same atlas draws the gear
+	-- slot's "+"/blink icons, which must stay; the gear art is blanked in SkinGear instead.
 	local function isBgTexture(t)
 		if type(t) ~= "string" then return false end
 		local lt = t:lower()
@@ -292,10 +282,9 @@ do
 		if obj and obj.SetAlpha then obj:SetAlpha(0) end
 	end
 
-	-- Bulletproof dropdown arrow: the server re-applies its common-dropdown-a-button
-	-- texture on hover, and HandleDropDownBox/HandleNextPrevButton don't hold (early
-	-- return on isSkinned / existing backdrop). So kill + FREEZE the button's own
-	-- textures and draw our own ElvUI arrow overlay the server can't touch.
+	-- Dropdown arrow: the server re-applies its arrow texture on hover and HandleDropDownBox
+	-- early-returns on isSkinned/existing backdrop, so freeze the button's own textures and
+	-- draw our own ElvUI arrow overlay the server can't touch.
 	local function skinDropArrow(btn)
 		if not btn or btn.__euiArrow then return end
 		btn.__euiArrow = true
@@ -312,20 +301,18 @@ do
 		btn.SetDisabledTexture = E.noop
 		local a = btn:CreateTexture(nil, "OVERLAY")
 		a:SetTexture(E.Media.Textures.ArrowUp)
-		a:SetRotation(S.ArrowRotation and S.ArrowRotation.down or 3.14) -- point down
+		a:SetRotation(S.ArrowRotation and S.ArrowRotation.down or 3.14)
 		a:SetSize(12, 12)
 		a:SetPoint("CENTER", btn, "CENTER", 0, 0)
 		a:SetVertexColor(1, 1, 1)
 	end
 	S.NozdorSkinDropArrow = skinDropArrow
 
-	-- Finder dropdowns are UIDropDownMenu-like frames whose 3-slice holder
-	-- (Left/Middle/Right = common-dropdown art) and arrow button the server re-lays-out
-	-- on every pass via HK_LFDShell_ApplyFinderDropdownLayout. Fighting that with
-	-- HandleDropDownBox mangled the box and dropped its selected-value text. Instead:
-	-- freeze the holder slices blank, lay a flat ElvUI backdrop over the holder geometry
-	-- (live-anchored to the server's own Left/Button so it tracks re-layout), swap in a
-	-- frozen ElvUI arrow, and leave the server's text + geometry untouched.
+	-- Finder dropdowns: the server re-lays-out the 3-slice holder + arrow every pass, and
+	-- HandleDropDownBox fought that (mangled the box, dropped its selected-value text).
+	-- Instead freeze the holder slices blank, lay a flat ElvUI backdrop over the holder
+	-- geometry (live-anchored to the server's Left/Button so it tracks re-layout), swap in
+	-- a frozen ElvUI arrow, and leave the server's text + geometry untouched.
 	local function skinFinderDropdown(dd)
 		local name = dd and dd.GetName and dd:GetName()
 		if not name or dd.__euiDD then return end
@@ -350,9 +337,8 @@ do
 	local function sweep(frame, depth)
 		depth = depth or 0
 		if not frame or depth > 12 then return end
-		-- Defensive: never descend into the pvp content frames (arena-points bar and
-		-- the prestige ring under the eagle). They draw with the pvpqueue atlas — which
-		-- we no longer blank — but keep the skip so no future pattern can erase them.
+		-- Defensive: never descend into the pvp content frames (arena-points bar, prestige
+		-- ring). They draw with the pvpqueue atlas, kept so no future pattern can erase them.
 		local apb = _G.HK_PvpDevContainer and _G.HK_PvpDevContainer._hkArenaBar
 		if apb and frame == apb then return end
 		if frame == _G.HK_PvpDevContainerDevInsetRing then return end
@@ -363,9 +349,8 @@ do
 			if r then isInset = true; if r.SetAlpha then r:SetAlpha(0); if r.Hide then r:Hide() end end end
 		end
 		if frame.Bgs and frame.Bgs.SetAlpha then frame.Bgs:SetAlpha(0) end
-		-- Content panels (a sizeable InsetFrameTemplate) get a dark recessed ElvUI
-		-- backdrop so the darkening follows the actual content per view, instead of
-		-- one big rectangle. Tiny chrome insets are just flattened above.
+		-- Sizeable content panels get a dark recessed backdrop so the darkening follows
+		-- the content per view; tiny chrome insets are just flattened above.
 		if isInset and not frame.__euiBackdrop and frame.CreateBackdrop and frame.GetWidth then
 			local w, h = frame:GetWidth() or 0, frame:GetHeight() or 0
 			if w > 60 and h > 60 then
@@ -373,7 +358,7 @@ do
 				frame:CreateBackdrop("Transparent")
 			end
 		end
-		-- Own decorative background textures + detect finder input fields (they carry a
+		-- Blank own decorative bg textures + detect finder input fields (carry a
 		-- common-input-border texture we must replace, not merely blank).
 		local hasInputBorder = false
 		if frame.GetRegions then
@@ -389,19 +374,15 @@ do
 				end
 			end
 		end
-		-- Finder input field (HKFinder*InputBorderTemplate): a Frame carrying the input
-		-- border, an inner editBox and a placeholder fontstring ON THE FIELD. Backdrop the
-		-- FIELD, not the inner editBox — an editBox backdrop draws over the placeholder and
-		-- hides it. Mark the inner editBox so the editbox branch below skips it.
+		-- Finder input field: backdrop the FIELD, not the inner editBox — an editBox
+		-- backdrop draws over the field's placeholder and hides it.
 		local innerEdit = frame.editBox or frame.searchBox
 		if (hasInputBorder or (innerEdit and frame.placeholder)) and not frame.__euiInputField then
 			frame.__euiInputField = true
-			-- Mark every editbox child (named or not, key set or not) so the editbox
-			-- branch skips it — its own backdrop would draw over the field's placeholder.
-			-- Also note multiline fields: they reparent their editbox into a ScrollFrame
-			-- with a focus button (HK_Finder_WireMultilineEditBox). Those manage their own
-			-- interactive stack, so leave them untouched beyond blanking the border — an
-			-- extra child backdrop here disturbed the description field's click-to-focus.
+			-- Mark editbox children so the editbox branch skips them. Multiline fields
+			-- reparent their editbox into a ScrollFrame and manage their own interactive
+			-- stack, so leave them untouched beyond the border — an extra child backdrop
+			-- disturbed the description field's click-to-focus.
 			local isMultiline = frame._hkDescScroll ~= nil
 			if innerEdit then innerEdit.__euiSkipEditBox = true end
 			if frame.GetChildren then
@@ -426,9 +407,8 @@ do
 		-- Dropdowns / scrollbars / buttons / editboxes found anywhere in the tree.
 		local name = frame.GetName and frame:GetName()
 		local ot = frame.GetObjectType and frame:GetObjectType()
-		-- 3-slice UIPanelButtonTemplate buttons, incl. ANONYMOUS ones (e.g. the gear
-		-- upgrade button) which expose their slices as parentKeys .Left/.Middle/.Right
-		-- rather than globals — the named-only branch below would miss those.
+		-- 3-slice buttons, incl. ANONYMOUS ones (e.g. gear upgrade) that expose slices as
+		-- parentKeys .Left/.Middle/.Right — the named-only branch below would miss those.
 		if ot == "Button" and not frame.__euiFinder then
 			local threeSlice = (frame.Left and frame.Middle and frame.Right)
 				or (name and _G[name.."Left"] and _G[name.."Middle"] and _G[name.."Right"])
@@ -442,11 +422,9 @@ do
 				frame.__euiFinder = true
 				if S.HandleScrollBar then S:HandleScrollBar(frame) end
 			elseif ot == "EditBox" then
-				-- Standalone search/input boxes. Skip editboxes that belong to a finder
-				-- input field — an editbox backdrop draws over the field's placeholder, and
-				-- for the multiline description it lands as an opaque box that swallows the
-				-- click-to-focus. Multiline fields reparent their (named) editbox into a
-				-- ScrollFrame, so the field flag isn't on the direct parent — walk up a few.
+				-- Skip editboxes belonging to a finder input field (a backdrop draws over the
+				-- placeholder / swallows the multiline click-to-focus). Multiline fields
+				-- reparent into a ScrollFrame so the flag isn't on the direct parent — walk up.
 				local skip = frame.__euiSkipEditBox
 				if not skip then
 					local p = frame
@@ -466,7 +444,6 @@ do
 				skinFinderDropdown(frame)
 			end
 		end
-		-- Recurse into child frames.
 		if frame.GetChildren then
 			for _, c in ipairs({ frame:GetChildren() }) do
 				sweep(c, depth + 1)
@@ -480,7 +457,6 @@ do
 		-- Only the redesigned finder (native MetalFrame2X + HK shell).
 		if not frame or not _G.HK_LFDShell_SetTab then return end
 
-		-- Flat window backdrop.
 		if not frame.backdrop then
 			frame:CreateBackdrop("Transparent")
 			frame.backdrop:Point("TOPLEFT", 2, -2)
@@ -539,24 +515,21 @@ do
 			end
 		end
 
-		-- Narrow the queue-frame dark backdrop (added by the stock LFD skin) to just
-		-- the right-hand content, i.e. right of the sidebar (it spanned the whole width).
+		-- Narrow the stock queue-frame backdrop to just the content right of the sidebar
+		-- (it spanned the whole width).
 		local function FixContentBackdrop()
 			local q = _G.LFDQueueFrame
 			if q and q.backdrop and _G.HK_LFDSidebar then
 				q.backdrop:ClearAllPoints()
-				-- Left edge 1px in; right edge stretched 2px out so the darkening lines up
-				-- with the PVE rewards content on both sides.
+				-- Nudged so the darkening lines up with the PVE rewards content on both sides.
 				q.backdrop:Point("TOPLEFT", _G.HK_LFDSidebar, "TOPRIGHT", 3, 0)
 				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -3, 4)
 			end
 		end
 
-		-- PVP dev container (quick/rated queue view): the left panel shows a bright
-		-- battleground image (pvpqueue atlas) and the dev inset a panelBg — both server-set
-		-- per tab. We can't blank by the pvpqueue pattern (it's shared with the currency
-		-- rings/arrows/bar), so target these panels directly: blank the bg and give the
-		-- panel a flat dark backdrop. SetAlpha(0) survives the server's later Show().
+		-- PVP dev container: the left panel's battleground image and the dev inset panelBg
+		-- can't be blanked by the pvpqueue pattern (shared with the currency rings/bar), so
+		-- target these panels directly. SetAlpha(0) survives the server's later Show().
 		local function SkinPvpDev()
 			local c = _G.HK_PvpDevContainer
 			if not c then return end
@@ -579,8 +552,7 @@ do
 		end
 
 		-- Left sidebar tab buttons: give each its own flat dark panel behind the
-		-- icon/ring/text (a per-button "darkening"), created once and drawn below the
-		-- button's own content.
+		-- icon/ring/text, drawn below the button's own content.
 		local SIDEBAR_BTNS = {
 			"HK_LFDSidebarRandomBtn", "HK_LFDSidebarPremadeBtn", "HK_LFDSidebarQuickBtn",
 			"HK_LFDSidebarRatedBtn", "HK_LFDSidebarTrainingBtn", "HK_LFDSidebarPvpBtn",
@@ -604,8 +576,7 @@ do
 		local function SkinAll()
 			FlattenChrome()
 			sweep(frame, 0)
-			-- The spectate view (PVPSpectatorFrame) is a sibling frame, not a child of
-			-- LFDParentFrame — sweep it too so its buttons/backgrounds get done.
+			-- PVPSpectatorFrame is a sibling, not a child of LFDParentFrame — sweep it too.
 			if _G.PVPSpectatorFrame then sweep(_G.PVPSpectatorFrame, 0) end
 			SkinPvpDev()
 			SkinSidebarButtons()
@@ -627,23 +598,18 @@ do
 		end
 		frame:HookScript("OnShow", SkinAll)
 
-		-- Dropdowns are laid out (and re-textured) by the server's finder layout pass,
-		-- which can run after a SkinAll for dropdowns created lazily on a tab. Re-skin
-		-- each dropdown right after the server lays it out (skinFinderDropdown is a
-		-- one-shot per frame, so repeat calls are cheap no-ops once frozen).
+		-- Dropdowns are laid out by the server's finder layout pass, which can run after
+		-- SkinAll for lazily-created ones — re-skin each right after (one-shot per frame).
 		if _G.HK_LFDShell_ApplyFinderDropdownLayout then
 			hooksecurefunc("HK_LFDShell_ApplyFinderDropdownLayout", function(dd)
 				skinFinderDropdown(dd)
 			end)
 		end
 
-		-- Spectate view (PVPSpectatorFrame under HK_SpectatorHost): shown and
-		-- re-decorated by the server on demand, so the one-shot SkinAll misses it and
-		-- the server re-paints the inset background each pass. Re-skin after every
-		-- spectator content layout: sweep the host + frame (buttons, scrollbar), blank
-		-- the marble the server re-applies, and hide the leftover portrait/eye model.
-		-- The spectate portrait (round eye) + 3D model are re-shown by the frame's own
-		-- data refresh AFTER our layout hook, so a one-time Hide is undone. Freeze them.
+		-- Spectate view is shown/re-decorated by the server on demand, so the one-shot
+		-- SkinAll misses it — re-skin after every spectator content layout. The portrait
+		-- + 3D model are re-shown by the frame's own data refresh after our hook, so a
+		-- one-time Hide is undone: freeze them.
 		local function freezeHidden(obj)
 			if not obj or obj.__euiFrozen then return end
 			obj.__euiFrozen = true
@@ -666,9 +632,8 @@ do
 			hooksecurefunc("HK_LFDShell_ApplySpectatorContentLayout", SkinSpectator)
 		end
 
-		-- The specific-battlegrounds list scroll (HK_LFDBgScroll) is created lazily inside
-		-- HK_LFDShell_ApplyBgList, which runs after the first SkinAll — so its scrollbar
-		-- was only skinned on the SECOND open. Skin it right after the list is applied.
+		-- HK_LFDBgScroll is created lazily in HK_LFDShell_ApplyBgList (after the first
+		-- SkinAll), so its scrollbar was only skinned on the second open — skin it here.
 		if _G.HK_LFDShell_ApplyBgList then
 			hooksecurefunc("HK_LFDShell_ApplyBgList", function()
 				local sb = _G.HK_LFDBgScrollScrollBar
@@ -679,9 +644,8 @@ do
 			end)
 		end
 
-		-- Gear upgrade tab (HK_GearUpgradeContainer): the itemupgrade atlas top/bottom
-		-- art becomes a flat dark backdrop; the (anonymous) upgrade button and honor/arena
-		-- dropdowns get skinned by the sweep. Re-run after each gear layout pass.
+		-- Gear upgrade tab: blank the itemupgrade top/bottom art into a flat backdrop (the
+		-- anonymous upgrade button + dropdowns are skinned by the sweep). Re-run per layout.
 		local function SkinGear()
 			local c = _G.HK_GearUpgradeContainer
 			if not c then return end
@@ -700,9 +664,8 @@ do
 			hooksecurefunc("HK_GearUpgrade_ApplyLayout", SkinGear)
 		end
 
-		-- The bottom tab bar (HK_LFDTopTabBar, anchored below the window) sits 2px too
-		-- low. The server re-anchors it in HK_LFDShell_ApplyTopTabLayout, so nudge it
-		-- up 2px after each layout pass (re-reads the server points → no drift).
+		-- The bottom tab bar sits 2px too low; the server re-anchors it per layout pass,
+		-- so nudge it up 2px after each (re-reads the server points → no drift).
 		if _G.HK_LFDShell_ApplyTopTabLayout then
 			hooksecurefunc("HK_LFDShell_ApplyTopTabLayout", function()
 				local bar = _G.HK_LFDTopTabBar

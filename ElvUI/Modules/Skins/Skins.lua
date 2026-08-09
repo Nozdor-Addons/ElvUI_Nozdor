@@ -512,12 +512,9 @@ local handleCloseButtonOnLeave = function(btn) if btn.Texture then btn.Texture:S
 function S:HandleCloseButton(f, point)
 	if not f then return end
 
-	-- Always StripTextures: the server's CloseButton2X_Apply adds red textures as new
-	-- regions on the button (via CreateTexture, not SetNormalTexture), so they survive
-	-- our setter noops — stripping is what removes them. StripTextures also blanks our
-	-- own f.Texture (it's a region of f), so re-set it afterwards rather than skipping
-	-- the strip, which keeps this idempotent: repeated calls (mass hook / OnShow /
-	-- per-window) clear any freshly-added red and keep exactly one ElvUI "X".
+	-- StripTextures removes the server's CloseButton2X_Apply red textures (added as new
+	-- regions via CreateTexture, so setter noops don't catch them); it also blanks our
+	-- own f.Texture, re-set below. Idempotent across mass hook / OnShow / per-window.
 	f:StripTextures()
 
 	if f:GetNormalTexture() then f:SetNormalTexture("") f.SetNormalTexture = E.noop end
@@ -541,14 +538,10 @@ function S:HandleCloseButton(f, point)
 	end
 end
 
--- NOZDOR: the server no longer uses the stock Blizzard window chrome. Its custom
--- windows are decorated at runtime by MetalFrame2X_Decorate/MetalFrame2X_Rebuild,
--- which move all decoration into a CHILD frame (frame.MetalBorder) plus a ring
--- portrait texture and a redbutton2x close button (frame.CloseButton). Because
--- StripTextures() only touches a frame's OWN regions (never nested child frames),
--- none of ElvUI's normal stripping reaches this art. HandleMetalFrame neutralizes
--- it so the flat ElvUI backdrop shows through. Safe to call repeatedly (idempotent)
--- and only does anything once the window has actually been decorated.
+-- NOZDOR: the server's MetalFrame2X_Decorate/Rebuild move window chrome into a CHILD
+-- frame (frame.MetalBorder) + ring portrait + redbutton2x close button, which
+-- StripTextures (own regions only, never child frames) can't reach. HandleMetalFrame
+-- neutralizes it so the flat ElvUI backdrop shows. Idempotent.
 local metalBorderRegions = {
 	"CornerTopLeft", "CornerTopRight", "CornerBottomLeft", "CornerBottomRight",
 	"BorderTop", "BorderBottom", "BorderLeft", "BorderRight",
@@ -567,18 +560,14 @@ function S:HandleMetalFrame(frame, closeButtonPoint)
 				region:SetAlpha(0)
 			end
 		end
-		-- A spec/portrait icon may be drawn on the border frame itself.
 		if border.specRingIcon then border.specRingIcon:Hide() end
 	end
 
-	-- Ring portrait / spec icon can live on the window rather than the border.
-	-- Use Hide(): the window keeps calling SetPortraitTexture() on the ring portrait
-	-- (e.g. on UNIT_PORTRAIT_UPDATE), which would undo a plain SetAlpha(0); a hidden
-	-- region stays hidden.
+	-- Hide (not SetAlpha 0): the window re-calls SetPortraitTexture on the ring portrait
+	-- (e.g. UNIT_PORTRAIT_UPDATE), which would undo an alpha; a hidden region stays hidden.
 	if frame.ringPortrait then frame.ringPortrait:Hide() end
 	if frame.specRingIcon then frame.specRingIcon:Hide() end
 
-	-- Reskin the custom (redbutton2x) close button to the ElvUI "X".
 	if frame.CloseButton then
 		S:HandleCloseButton(frame.CloseButton, closeButtonPoint)
 	end

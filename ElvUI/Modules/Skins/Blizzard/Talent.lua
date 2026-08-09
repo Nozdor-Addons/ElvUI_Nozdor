@@ -16,22 +16,14 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_TalentUI", function()
 
 	S:SetBackdropHitRect(PlayerTalentFrame)
 
-	-- Base metal-frame adaptation (as on the Character window): drop the metal
-	-- border + spec ring icon, reskin the new close button, and hide the server's
-	-- rock background + top shadow so the flat ElvUI backdrop shows. The frame is
-	-- decorated in its OnLoad, so the chrome already exists at this callback.
+	-- Base metal-frame adaptation: hide the server's rock background + top shadow so the
+	-- flat ElvUI backdrop shows.
 	if S.HandleMetalFrame then S:HandleMetalFrame(PlayerTalentFrame, PlayerTalentFrame.backdrop) end
 	if _G.PlayerTalentFrameBackground then _G.PlayerTalentFrameBackground:SetAlpha(0) end
 	if _G.PlayerTalentFrameTopTileStreaks then _G.PlayerTalentFrameTopTileStreaks:SetAlpha(0) end
-	-- The inner content inset (InsetFrameTemplate: _UI-Frame borders + marble bg) is
-	-- re-textured on show, so blank its own textures every show. Do NOT give it a
-	-- backdrop: the glyph parchment and rune circle sit on frames BELOW this inset,
-	-- so a backdrop here would draw on top and darken/cover them. The window's own
-	-- flat backdrop already darkens the talent content area.
-	-- Returning from the glyph view (PlayerTalentFrame_HideGlyphFrame) re-shows the
-	-- marble on contentInset.Bgs (SetAlpha(1)/SetTexture) on every tab switch, and
-	-- that path fires no OnShow — so a one-shot blank comes back. Noop the texture
-	-- setters after blanking so the marble can't return.
+	-- Do NOT backdrop this inset: the glyph parchment/rune circle sit on frames BELOW it.
+	-- Noop the setters after blanking — HideGlyphFrame re-shows the marble on tab switch
+	-- with no OnShow, so a one-shot blank would come back.
 	local function CleanTalentInset(inset)
 		if not inset then return end
 		if inset.GetRegions then
@@ -67,9 +59,8 @@ do
 		-- numTalentGroups, numPetTalentGroups
 		-- force = true
 		local function UpdateTalentFrameOffset(numTalentGroups, numPetTalentGroups, force)
-			-- The server pins the rune view to 512 wide so its native circle stays
-			-- round. The dual-spec width offset would inflate the window and stretch
-			-- the circle into an oval, so never add it while the rune host is shown.
+			-- Rune view is pinned to 512 wide for the round circle; the dual-spec width
+			-- offset would stretch it to an oval, so never add it while RuneHost is shown.
 			local runeHost = PlayerTalentFrame.RuneHost
 			if runeHost and runeHost:IsShown() then
 				if force or PlayerTalentFrame.ElvUI_OffsetActive then
@@ -108,10 +99,7 @@ do
 				UpdateTalentFrameOffset(numTalentGroups, numPetTalentGroups)
 			end)
 
-			-- Re-run the offset logic when entering/leaving the rune view so the window
-			-- snaps to the server's 512-wide (round-circle) size and back. Rune-view
-			-- chrome (metal frame, RuneHost.Bg/close) is handled in Runes.lua; the
-			-- native circle layout is left entirely to the server.
+			-- Re-run the offset on enter/leave rune view so the window snaps to 512-wide and back.
 			if _G.PlayerTalentFrame_ShowRuneFrame then
 				hooksecurefunc("PlayerTalentFrame_ShowRuneFrame", function()
 					UpdateTalentFrameOffset(nil, nil, true)
@@ -150,13 +138,10 @@ do
 		S:HandleButton(PlayerTalentFramePointsBarResetButton)
 	end
 
-	-- Server control bar (grid/multi-tree view) uses its own Learn/Reset buttons
-	-- (PlayerTalentFrameControlBar*Button), not the old PlayerTalentFrame*Button
-	-- ones. Skin them so they match the rest of the ElvUI window. UIPanelButton-
-	-- Template re-SetTextures its Left/Middle/Right regions on every OnShow/
-	-- OnEnable/OnDisable, and the Learn button toggles state as pending changes
-	-- appear, so a one-shot HandleButton gets undone. Re-blank the edges after any
-	-- state change.
+	-- Grid-view control bar has its own Learn/Reset buttons (PlayerTalentFrameControlBar*).
+	-- UIPanelButtonTemplate re-SetTextures its Left/Middle/Right on every OnShow/Enable/
+	-- Disable and the Learn button toggles state, undoing a one-shot HandleButton — so
+	-- re-blank the edges after any state change.
 	local function SkinControlButton(btn)
 		if not btn then return end
 		S:HandleButton(btn)
@@ -175,13 +160,9 @@ do
 	SkinControlButton(PlayerTalentFrameControlBarLearnButton)
 	SkinControlButton(PlayerTalentFrameControlBarResetButton)
 
-	-- The talent trees are drawn as three grid columns, each wrapped by the server
-	-- in an InsetFrameTemplate: a marble Bgs fill + eight _UI-Frame border pieces
-	-- (all parentKeys), plus the class/tree art on the column itself. Turn each
-	-- column into a flat dark panel: hide the marble border pieces, blank the tree
-	-- art, and REUSE the inset's own Bgs region (already anchored to fill the
-	-- column, just hidden by the server) as a solid dark fill. Reusing Bgs avoids
-	-- the frame-level/visibility pitfalls of a separate CreateBackdrop here.
+	-- Talent trees are three grid columns, each an InsetFrameTemplate. Flatten each to a
+	-- dark panel by REUSING the inset's own Bgs region as the dark fill (already anchored
+	-- to the column) — avoids the frame-level/visibility pitfalls of a separate backdrop.
 	local GRID_BG_SUFFIX = {
 		"Background", "BackgroundTopLeft", "BackgroundTopRight",
 		"BackgroundBottomLeft", "BackgroundBottomRight",
@@ -300,15 +281,14 @@ do
 	PlayerTalentFrameResetButton:Point("RIGHT", -4, 1)
 	PlayerTalentFrameLearnButton:Point("RIGHT", PlayerTalentFrameResetButton, "LEFT", -3, 0)
 
-	-- Side spec tabs stick out on the right edge (like a spellbook skill tab). The
-	-- old -33 x offset was tuned to the stock frame border and pulled them INTO the
-	-- new metal window ("recessed"); anchor them just past the right edge instead.
+	-- The old -33 x offset was tuned to the stock frame border and pulled the spec tabs
+	-- INTO the new metal window; anchor them just past the right edge instead.
 	PlayerSpecTab1:Point("TOPLEFT", PlayerTalentFrame, "TOPRIGHT", -2, -45)
 	PlayerSpecTab1.ClearAllPoints = E.noop
 	PlayerSpecTab1.SetPoint = E.noop
 
-	-- Anchor the bottom tab row's TOP to the window's BOTTOM so it hangs flush below
-	-- the frame (the old y=46 dragged the whole row up into the content).
+	-- Anchor the bottom tab row's TOP to the window's BOTTOM so it hangs flush below the
+	-- frame (the old y=46 dragged the row up into the content).
 	PlayerTalentFrameTab1:ClearAllPoints()
 	PlayerTalentFrameTab1:Point("TOPLEFT", PlayerTalentFrame, "BOTTOMLEFT", 11, 2)
 end)
