@@ -10,8 +10,14 @@ local pairs = pairs
 S:AddCallbackForAddon('Blizzard_TalentUI', 'Runes_UlduarSecrets_AlwaysSkin_PerButton', function()
 	if not E.private.skins.blizzard.enable or not E.private.skins.blizzard.talent then return end
 
+	-- Pin the rune window to a fixed size instead of snapshotting the current
+	-- (non-rune) talent size. With override=false the snapshot captures whatever
+	-- the talent view happens to be — and on a dual-spec character ElvUI's
+	-- talent-frame width offset inflates that, so the forced rune host comes out
+	-- wide and the circle stretches into an oval. Force the tuned size so the
+	-- circle stays round regardless of spec count / offset state.
 	local PTF_SIZE = {
-		override = false,
+		override = true,
 		width  = 584,
 		height = 652,
 	}
