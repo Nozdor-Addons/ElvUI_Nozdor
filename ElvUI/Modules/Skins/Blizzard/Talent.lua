@@ -28,6 +28,10 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_TalentUI", function()
 	-- backdrop: the glyph parchment and rune circle sit on frames BELOW this inset,
 	-- so a backdrop here would draw on top and darken/cover them. The window's own
 	-- flat backdrop already darkens the talent content area.
+	-- Returning from the glyph view (PlayerTalentFrame_HideGlyphFrame) re-shows the
+	-- marble on contentInset.Bgs (SetAlpha(1)/SetTexture) on every tab switch, and
+	-- that path fires no OnShow — so a one-shot blank comes back. Noop the texture
+	-- setters after blanking so the marble can't return.
 	local function CleanTalentInset(inset)
 		if not inset then return end
 		if inset.GetRegions then
@@ -35,7 +39,13 @@ S:AddCallbackForAddon("Blizzard_TalentUI", "Skin_Blizzard_TalentUI", function()
 			while true do
 				local r = select(j, inset:GetRegions())
 				if not r then break end
-				if r.GetObjectType and r:GetObjectType() == "Texture" then r:SetTexture(nil); r:SetAlpha(0) end
+				if r.GetObjectType and r:GetObjectType() == "Texture" then
+					r:SetTexture(nil)
+					r:SetAlpha(0)
+					r.SetTexture = E.noop
+					r.SetAlpha = E.noop
+					r.Show = E.noop
+				end
 				j = j + 1
 			end
 		end
