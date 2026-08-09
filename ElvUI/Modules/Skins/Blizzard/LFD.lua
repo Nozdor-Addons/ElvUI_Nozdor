@@ -275,8 +275,10 @@ do
 		"ui%-lfg%-background", "ui%-lfg%-bluebg", "ui%-frame",
 		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
 		"char%-paperdoll", "char%-inner", "%-goldborder", "common%-dropdown",
-		"itemupgrade", "orderhalltalents",
 	}
+	-- NB: "itemupgrade" is intentionally NOT a blanket pattern — the same atlas draws
+	-- the gear slot's "+" and blink icons, which must stay. The gear container's own
+	-- top/bottom art is blanked explicitly in SkinGear instead.
 	local function isBgTexture(t)
 		if type(t) ~= "string" then return false end
 		local lt = t:lower()
@@ -550,12 +552,39 @@ do
 			end
 		end
 
+		-- PVP dev container (quick/rated queue view): the left panel shows a bright
+		-- battleground image (pvpqueue atlas) and the dev inset a panelBg — both server-set
+		-- per tab. We can't blank by the pvpqueue pattern (it's shared with the currency
+		-- rings/arrows/bar), so target these panels directly: blank the bg and give the
+		-- panel a flat dark backdrop. SetAlpha(0) survives the server's later Show().
+		local function SkinPvpDev()
+			local c = _G.HK_PvpDevContainer
+			if not c then return end
+			local left = c.leftPanel
+			if left then
+				if left.bg and left.bg.SetAlpha then left.bg:SetAlpha(0) end
+				if left.Bgs and left.Bgs.SetAlpha then left.Bgs:SetAlpha(0) end
+				if not left.__euiBackdrop and left.CreateBackdrop then
+					left.__euiBackdrop = true
+					left:CreateBackdrop("Transparent")
+					if left.backdrop and left.backdrop.SetFrameLevel then
+						left.backdrop:SetFrameLevel(math.max(0, (left:GetFrameLevel() or 1) - 1))
+					end
+				end
+			end
+			local inset = c.devInset
+			if inset and inset.panelBg and inset.panelBg.SetAlpha then
+				inset.panelBg:SetAlpha(0)
+			end
+		end
+
 		local function SkinAll()
 			FlattenChrome()
 			sweep(frame, 0)
 			-- The spectate view (PVPSpectatorFrame) is a sibling frame, not a child of
 			-- LFDParentFrame — sweep it too so its buttons/backgrounds get done.
 			if _G.PVPSpectatorFrame then sweep(_G.PVPSpectatorFrame, 0) end
+			SkinPvpDev()
 			SkinTabs()
 			SkinButtons()
 			FixContentBackdrop()
@@ -589,15 +618,25 @@ do
 		-- the server re-paints the inset background each pass. Re-skin after every
 		-- spectator content layout: sweep the host + frame (buttons, scrollbar), blank
 		-- the marble the server re-applies, and hide the leftover portrait/eye model.
+		-- The spectate portrait (round eye) + 3D model are re-shown by the frame's own
+		-- data refresh AFTER our layout hook, so a one-time Hide is undone. Freeze them.
+		local function freezeHidden(obj)
+			if not obj or obj.__euiFrozen then return end
+			obj.__euiFrozen = true
+			if obj.SetAlpha then obj:SetAlpha(0) end
+			if obj.Hide then obj:Hide() end
+			obj.Show = E.noop
+		end
 		local function SkinSpectator()
 			local host = _G.HK_SpectatorHost
 			if host then sweep(host, 0) end
 			if _G.PVPSpectatorFrame then sweep(_G.PVPSpectatorFrame, 0) end
 			local inset = host and host.inset
 			if inset and inset.Bgs and inset.Bgs.SetAlpha then inset.Bgs:SetAlpha(0) end
-			hide(_G.PVPSpectatorFramePortrait)
-			local pm = _G.PVPSpectatorFramePortraitModelModel or _G.PVPSpectatorFramePortraitModel
-			if pm and pm.Hide then pm:Hide() end
+			-- The round portrait, its ring and the 3D model — all leftover window chrome.
+			freezeHidden(_G.PVPSpectatorFramePortrait)
+			freezeHidden(_G.PVPSpectatorFramePortraitModel)
+			freezeHidden(_G.PVPSpectatorFramePortraitModelModel)
 		end
 		if _G.HK_LFDShell_ApplySpectatorContentLayout then
 			hooksecurefunc("HK_LFDShell_ApplySpectatorContentLayout", SkinSpectator)
