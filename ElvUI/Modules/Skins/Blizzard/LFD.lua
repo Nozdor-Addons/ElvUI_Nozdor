@@ -292,11 +292,11 @@ do
 	local function sweep(frame, depth)
 		depth = depth or 0
 		if not frame or depth > 12 then return end
-		-- Skip the arena-points bar: its track/fill/ring use Interface\FrameGeneral\
-		-- pvpqueue (same texture as the container bg), so the pattern sweep would
-		-- wrongly blank the whole bar. Leave it to the server.
+		-- Skip content frames that draw with a "background" texture (pvpqueue) we'd
+		-- otherwise blank: the arena-points bar and the prestige ring under the eagle.
 		local apb = _G.HK_PvpDevContainer and _G.HK_PvpDevContainer._hkArenaBar
 		if apb and frame == apb then return end
+		if frame == _G.HK_PvpDevContainerDevInsetRing then return end
 		-- InsetFrameTemplate marble + border pieces (parentKeys).
 		local isInset = frame.Bgs ~= nil
 		for _, key in ipairs(INSET_BORDER) do
@@ -341,11 +341,24 @@ do
 				-- Dropdown (UIDropDownMenu-like): a Frame with an arrow button + middle.
 				frame.__euiFinder = true
 				if S.HandleDropDownBox then S:HandleDropDownBox(frame) end
-				-- Force the ElvUI arrow: HandleDropDownBox skips the arrow when a
-				-- backdrop already exists, and the server's custom arrow texture
-				-- (common-dropdown-a-button) otherwise stays.
+				-- The server re-applies its custom holder + arrow textures on hover, so
+				-- blanking once isn't enough — blank AND freeze the setters.
+				for _, sfx in ipairs({ "Left", "Middle", "Right" }) do
+					local t = _G[name..sfx]
+					if t then
+						t:SetTexture(nil); t:SetAlpha(0)
+						t.SetTexture = E.noop; t.SetAlpha = E.noop; t.Show = E.noop
+					end
+				end
 				local ddbtn = _G[name.."Button"]
-				if ddbtn and S.HandleNextPrevButton then S:HandleNextPrevButton(ddbtn) end
+				if ddbtn then
+					if S.HandleNextPrevButton then S:HandleNextPrevButton(ddbtn) end
+					local nt = ddbtn.GetNormalTexture and ddbtn:GetNormalTexture()
+					if nt then nt.SetTexture = E.noop end
+					ddbtn.SetNormalTexture = E.noop
+					ddbtn.SetPushedTexture = E.noop
+					ddbtn.SetHighlightTexture = E.noop
+				end
 			end
 		end
 		-- Recurse into child frames.
@@ -441,6 +454,13 @@ do
 			SkinTabs()
 			SkinButtons()
 			FixContentBackdrop()
+			-- Shift the description panel's dark backdrop 3px left.
+			local di = _G.HK_LFDDescInset
+			if di and di.backdrop then
+				di.backdrop:ClearAllPoints()
+				di.backdrop:Point("TOPLEFT", di, "TOPLEFT", -4, 1)
+				di.backdrop:Point("BOTTOMRIGHT", di, "BOTTOMRIGHT", -2, -1)
+			end
 		end
 		SkinAll()
 
