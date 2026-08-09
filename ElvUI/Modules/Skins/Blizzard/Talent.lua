@@ -150,21 +150,40 @@ do
 	SkinControlButton(PlayerTalentFrameControlBarResetButton)
 
 	-- The talent trees are drawn as three grid columns, each wrapped by the server
-	-- in an InsetFrameTemplate (marble _UI-Frame border) with a rock/marble
-	-- background. Strip that chrome and give each column a strong dark ElvUI
-	-- backdrop so the trees read as flat dark panels instead of framed marble.
+	-- in an InsetFrameTemplate: a marble Bgs fill + eight _UI-Frame border pieces
+	-- (all parentKeys), plus the class/tree art on the column itself. Turn each
+	-- column into a flat dark panel: hide the marble border pieces, blank the tree
+	-- art, and REUSE the inset's own Bgs region (already anchored to fill the
+	-- column, just hidden by the server) as a solid dark fill. Reusing Bgs avoids
+	-- the frame-level/visibility pitfalls of a separate CreateBackdrop here.
 	local GRID_BG_SUFFIX = {
 		"Background", "BackgroundTopLeft", "BackgroundTopRight",
 		"BackgroundBottomLeft", "BackgroundBottomRight",
 	}
+	local GRID_INSET_BORDER = {
+		"InsetBorderTopLeft", "InsetBorderTopRight",
+		"InsetBorderBottomLeft", "InsetBorderBottomRight",
+		"InsetBorderTop", "InsetBorderBottom", "InsetBorderLeft", "InsetBorderRight",
+	}
 	local function SkinGridColumns()
 		for c = 1, 3 do
 			local inset = _G["PlayerTalentFrameGridColumn"..c.."Inset"]
-			if inset and not inset.__euiSkinned then
-				inset.__euiSkinned = true
-				inset:StripTextures()
-				inset:CreateBackdrop("Transparent")
-				inset.backdrop:SetBackdropColor(0, 0, 0, 0.6)
+			if inset then
+				for _, key in ipairs(GRID_INSET_BORDER) do
+					local r = inset[key]
+					if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
+				end
+				if inset.Bgs then
+					inset.Bgs:Show()
+					inset.Bgs:SetHorizTile(false)
+					inset.Bgs:SetVertTile(false)
+					inset.Bgs:SetTexture("Interface\\Buttons\\WHITE8X8")
+					inset.Bgs:SetVertexColor(0, 0, 0, 0.6)
+				elseif not inset.__euiBackdrop then
+					inset.__euiBackdrop = true
+					inset:CreateBackdrop("Transparent")
+					inset.backdrop:SetBackdropColor(0, 0, 0, 0.6)
+				end
 			end
 			for _, sfx in ipairs(GRID_BG_SUFFIX) do
 				local bg = _G["PlayerTalentFrameGridColumn"..c..sfx]
