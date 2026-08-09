@@ -578,6 +578,29 @@ do
 			end
 		end
 
+		-- Left sidebar tab buttons: give each its own flat dark panel behind the
+		-- icon/ring/text (a per-button "darkening"), created once and drawn below the
+		-- button's own content.
+		local SIDEBAR_BTNS = {
+			"HK_LFDSidebarRandomBtn", "HK_LFDSidebarPremadeBtn", "HK_LFDSidebarQuickBtn",
+			"HK_LFDSidebarRatedBtn", "HK_LFDSidebarTrainingBtn", "HK_LFDSidebarPvpBtn",
+			"HK_LFDSidebarSpectateBtn", "HK_LFDSidebarBracket1v1Btn",
+			"HK_LFDSidebarBracket2v2Btn", "HK_LFDSidebarBracket3v3Btn",
+			"HK_LFDSidebarBracketRbgBtn",
+		}
+		local function SkinSidebarButtons()
+			for _, n in ipairs(SIDEBAR_BTNS) do
+				local b = _G[n]
+				if b and not b.__euiBackdrop and b.CreateBackdrop then
+					b.__euiBackdrop = true
+					b:CreateBackdrop("Transparent")
+					if b.backdrop and b.backdrop.SetFrameLevel then
+						b.backdrop:SetFrameLevel(math.max(0, (b:GetFrameLevel() or 1) - 1))
+					end
+				end
+			end
+		end
+
 		local function SkinAll()
 			FlattenChrome()
 			sweep(frame, 0)
@@ -585,6 +608,7 @@ do
 			-- LFDParentFrame — sweep it too so its buttons/backgrounds get done.
 			if _G.PVPSpectatorFrame then sweep(_G.PVPSpectatorFrame, 0) end
 			SkinPvpDev()
+			SkinSidebarButtons()
 			SkinTabs()
 			SkinButtons()
 			FixContentBackdrop()
@@ -637,24 +661,22 @@ do
 			freezeHidden(_G.PVPSpectatorFramePortrait)
 			freezeHidden(_G.PVPSpectatorFramePortraitModel)
 			freezeHidden(_G.PVPSpectatorFramePortraitModelModel)
-			-- The refresh button is a plain 128RedButton icon (not a 3-slice UIPanelButton,
-			-- so the sweep skips it). Give it an ElvUI backdrop + the clean UI-RefreshButton
-			-- icon the rest of the finder already uses.
-			local rb = _G.PVPSpectatorFrameRefreshButton
-			if rb and not rb.__euiSkinned then
-				rb.__euiSkinned = true
-				rb:StripTextures()
-				if not rb.backdrop then rb:CreateBackdrop("Default") end
-				rb:SetNormalTexture("Interface\\Buttons\\UI-RefreshButton")
-				rb:SetPushedTexture("Interface\\Buttons\\UI-RefreshButton")
-				rb:SetHighlightTexture("Interface\\Buttons\\UI-RefreshButton")
-				for _, t in ipairs({ rb:GetNormalTexture(), rb:GetPushedTexture(), rb:GetHighlightTexture() }) do
-					if t then t:SetInside(rb.backdrop, 1, 1); t:SetTexCoord(0, 1, 0, 1) end
-				end
-			end
 		end
 		if _G.HK_LFDShell_ApplySpectatorContentLayout then
 			hooksecurefunc("HK_LFDShell_ApplySpectatorContentLayout", SkinSpectator)
+		end
+
+		-- The specific-battlegrounds list scroll (HK_LFDBgScroll) is created lazily inside
+		-- HK_LFDShell_ApplyBgList, which runs after the first SkinAll — so its scrollbar
+		-- was only skinned on the SECOND open. Skin it right after the list is applied.
+		if _G.HK_LFDShell_ApplyBgList then
+			hooksecurefunc("HK_LFDShell_ApplyBgList", function()
+				local sb = _G.HK_LFDBgScrollScrollBar
+				if sb and not sb.__euiFinder then
+					sb.__euiFinder = true
+					if S.HandleScrollBar then S:HandleScrollBar(sb) end
+				end
+			end)
 		end
 
 		-- Gear upgrade tab (HK_GearUpgradeContainer): the itemupgrade atlas top/bottom
