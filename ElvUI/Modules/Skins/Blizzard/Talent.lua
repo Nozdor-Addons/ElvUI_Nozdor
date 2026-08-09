@@ -57,18 +57,6 @@ do
 		-- numTalentGroups, numPetTalentGroups
 		-- force = true
 		local function UpdateTalentFrameOffset(numTalentGroups, numPetTalentGroups, force)
-			-- The rune view (third tab) is pinned to 512 wide by the server so the
-			-- rune circle stays round; the dual-spec width offset would stretch the
-			-- window (and squash the circle into an oval), so never add it there.
-			local runeHost = PlayerTalentFrame.RuneHost
-			if runeHost and runeHost:IsShown() then
-				if force or PlayerTalentFrame.ElvUI_OffsetActive then
-					S:SetUIPanelWindowInfo(PlayerTalentFrame, "width")
-					PlayerTalentFrame.ElvUI_OffsetActive = false
-				end
-				return
-			end
-
 			if not numTalentGroups or not numPetTalentGroups then
 				numTalentGroups = GetNumTalentGroups(false, false)
 				numPetTalentGroups = GetNumTalentGroups(false, true)
@@ -98,21 +86,14 @@ do
 				UpdateTalentFrameOffset(numTalentGroups, numPetTalentGroups)
 			end)
 
-			-- Re-run the offset logic when entering/leaving the rune view so the
-			-- window snaps back to the server's 512-wide (round-circle) size, and
-			-- hide the RuneHost's own old close button — it lives alongside the new
-			-- metal close button (it's a child frame, so the server's region-hide
-			-- loop never reaches it).
+			-- Rune view sizing/layout is owned by Runes.lua (the ported iqxaxb
+			-- solution); don't touch the window width here. Only hide the RuneHost's
+			-- own old close button, which sits alongside the new metal close button
+			-- (it's a child frame, so the server's region-hide loop never reaches it).
 			if _G.PlayerTalentFrame_ShowRuneFrame then
 				hooksecurefunc("PlayerTalentFrame_ShowRuneFrame", function()
-					UpdateTalentFrameOffset(nil, nil, true)
 					local rh = PlayerTalentFrame.RuneHost
 					if rh and rh.CloseButton then rh.CloseButton:Hide() end
-				end)
-			end
-			if _G.PlayerTalentFrame_HideRuneFrame then
-				hooksecurefunc("PlayerTalentFrame_HideRuneFrame", function()
-					UpdateTalentFrameOffset(nil, nil, true)
 				end)
 			end
 		end
@@ -145,13 +126,28 @@ do
 
 	-- Server control bar (grid/multi-tree view) uses its own Learn/Reset buttons
 	-- (PlayerTalentFrameControlBar*Button), not the old PlayerTalentFrame*Button
-	-- ones. Skin them so they match the rest of the ElvUI window.
-	if PlayerTalentFrameControlBarLearnButton then
-		S:HandleButton(PlayerTalentFrameControlBarLearnButton)
+	-- ones. Skin them so they match the rest of the ElvUI window. UIPanelButton-
+	-- Template re-SetTextures its Left/Middle/Right regions on every OnShow/
+	-- OnEnable/OnDisable, and the Learn button toggles state as pending changes
+	-- appear, so a one-shot HandleButton gets undone. Re-blank the edges after any
+	-- state change.
+	local function SkinControlButton(btn)
+		if not btn then return end
+		S:HandleButton(btn)
+		local name = btn:GetName()
+		local function hideEdges()
+			for _, sfx in ipairs({ "Left", "Middle", "Right" }) do
+				local r = (name and _G[name..sfx]) or btn[sfx]
+				if r and r.SetAlpha then r:SetAlpha(0) end
+			end
+		end
+		btn:HookScript("OnShow", hideEdges)
+		btn:HookScript("OnEnable", hideEdges)
+		btn:HookScript("OnDisable", hideEdges)
+		hideEdges()
 	end
-	if PlayerTalentFrameControlBarResetButton then
-		S:HandleButton(PlayerTalentFrameControlBarResetButton)
-	end
+	SkinControlButton(PlayerTalentFrameControlBarLearnButton)
+	SkinControlButton(PlayerTalentFrameControlBarResetButton)
 
 	-- The talent trees are drawn as three grid columns, each wrapped by the server
 	-- in an InsetFrameTemplate (marble _UI-Frame border) with a rock/marble
