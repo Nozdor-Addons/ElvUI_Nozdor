@@ -119,6 +119,85 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 		end
 	end
 
+	-- ===================== per-tab background/inset removal =====================
+	-- IMPORTANT: this block (and its hooks) is set up BEFORE the one-time
+	-- paperdoll/rotate/PVP styling, because that styling can throw on the server's
+	-- redesigned widgets (e.g. custom rotate arrows with no NormalTexture) and a
+	-- throw would abort the whole callback — which is why the inspect window
+	-- previously "never changed". Applied on every tab switch/show.
+
+	local function SkinPaperDoll()
+		hide(_G.InspectPaperDollRockBg)
+		hide(_G.InspectPaperDollHeaderRock)
+		hide(_G.InspectPaperDollTopTileStreaks)
+		flattenInset(_G.InspectPaperDollInset)
+	end
+
+	local function SkinPVP()
+		if _G.InspectPVPFrame then
+			hide(InspectPVPFrame.RockBg)
+			hide(InspectPVPFrame.TopTileStreaks)
+		end
+		flattenInset(_G.InspectPVPInset)
+	end
+
+	-- Talents: rock+streak are unnamed runtime textures on InspectTalentFrame; the
+	-- server already hid the frame's other regions once. Flatten each grid column
+	-- inset (marble around each tree) and blank the tree art, and darken the
+	-- content inset (which sits BELOW the grid, so this never covers the icons).
+	local function SkinTalentGrid()
+		for c = 1, 3 do
+			flattenInset(_G["InspectTalentFrameGridColumn"..c.."Inset"])
+			for _, sfx in ipairs(GRID_BG_SUFFIX) do
+				hide(_G["InspectTalentFrameGridColumn"..c..sfx])
+			end
+		end
+	end
+	local function SkinTalents()
+		local frame = _G.InspectTalentFrame
+		if not frame then return end
+		hideRockRegions(frame)
+		darkenInset(frame.contentInset or _G.InspectTalentFrameContentInset)
+		SkinTalentGrid()
+	end
+
+	local function SkinGlyphs()
+		local frame = _G.InspectGlyphFrame
+		if not frame then return end
+		hideRockRegions(frame)
+		flattenInset(frame.contentInset or _G.InspectGlyphFrameContentInset)
+		if _G.InspectGlyphFrameBackground then _G.InspectGlyphFrameBackground:SetAlpha(0.6) end
+	end
+
+	local function SkinRunes()
+		local host = _G.InspectRuneFrameHost
+		if not host then return end
+		blankTextureRegions(host)
+		if host.CloseButton then host.CloseButton:Hide() end
+	end
+
+	local function SkinCurrentTab()
+		SkinPaperDoll()
+		SkinPVP()
+		SkinTalents()
+		SkinGlyphs()
+		SkinRunes()
+		FlattenChrome()
+	end
+	SkinCurrentTab()
+
+	if _G.TalentFrame_ApplyColumnInsets then
+		hooksecurefunc("TalentFrame_ApplyColumnInsets", function(tf)
+			if tf == _G.InspectTalentFrame then SkinTalentGrid() end
+		end)
+	end
+	if _G.InspectSwitchTabs then
+		hooksecurefunc("InspectSwitchTabs", SkinCurrentTab)
+	end
+	if _G.InspectFrame_OnShow then
+		hooksecurefunc("InspectFrame_OnShow", SkinCurrentTab)
+	end
+
 	-- ===================== paperdoll gear (once) =====================
 	InspectPaperDollFrame:StripTextures()
 
@@ -168,14 +247,20 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 	end
 	hooksecurefunc("InspectPaperDollItemSlotButton_Update", styleButton)
 
-	S:HandleRotateButton(InspectModelRotateLeftButton)
-	S:HandleRotateButton(InspectModelRotateRightButton)
-	InspectModelRotateLeftButton:Point("TOPLEFT", 4, -4)
-	InspectModelRotateRightButton:Point("TOPLEFT", InspectModelRotateLeftButton, "TOPRIGHT", 3, 0)
+	-- Rotate arrows: HandleRotateButton assumes a NormalTexture and would throw on
+	-- the server's custom arrows (nil texture) — which used to abort this whole
+	-- callback. Guard it.
+	local function SkinRotate(btn)
+		if btn and btn.GetNormalTexture and btn:GetNormalTexture() then
+			S:HandleRotateButton(btn)
+		end
+	end
+	SkinRotate(_G.InspectModelRotateLeftButton)
+	SkinRotate(_G.InspectModelRotateRightButton)
 
 	-- ===================== PVP (once) =====================
-	InspectPVPFrame:StripTextures()
-	for i = 1, MAX_ARENA_TEAMS do
+	if _G.InspectPVPFrame then InspectPVPFrame:StripTextures() end
+	for i = 1, (MAX_ARENA_TEAMS or 0) do
 		local frame = _G["InspectPVPTeam"..i]
 		if frame then
 			frame:StripTextures()
@@ -184,85 +269,6 @@ S:AddCallbackForAddon("Blizzard_InspectUI", "Skin_Blizzard_InspectUI", function(
 			frame.backdrop:Point("BOTTOMRIGHT", -24, -5)
 			S:SetBackdropHitRect(frame)
 		end
-	end
-
-	-- ===================== per-tab background/inset removal =====================
-	-- Applied on every tab switch/show, because the server (re)builds each tab's
-	-- rock bg + inset when it is shown.
-
-	local function SkinPaperDoll()
-		hide(_G.InspectPaperDollRockBg)
-		hide(_G.InspectPaperDollHeaderRock)
-		hide(_G.InspectPaperDollTopTileStreaks)
-		flattenInset(_G.InspectPaperDollInset)
-	end
-
-	local function SkinPVP()
-		if InspectPVPFrame then
-			hide(InspectPVPFrame.RockBg)
-			hide(InspectPVPFrame.TopTileStreaks)
-		end
-		flattenInset(_G.InspectPVPInset)
-	end
-
-	-- Talents: rock+streak are unnamed runtime textures on InspectTalentFrame; the
-	-- server already hid the frame's other regions once. Flatten each grid column
-	-- inset (marble around each tree) and blank the tree art, and darken the
-	-- content inset (which sits BELOW the grid, so this never covers the icons).
-	local function SkinTalentGrid()
-		for c = 1, 3 do
-			flattenInset(_G["InspectTalentFrameGridColumn"..c.."Inset"])
-			for _, sfx in ipairs(GRID_BG_SUFFIX) do
-				hide(_G["InspectTalentFrameGridColumn"..c..sfx])
-			end
-		end
-	end
-	local function SkinTalents()
-		local frame = _G.InspectTalentFrame
-		if not frame then return end
-		hideRockRegions(frame)
-		darkenInset(frame.contentInset or _G.InspectTalentFrameContentInset)
-		SkinTalentGrid()
-	end
-
-	-- Glyphs: keep the server glyph-bg parchment (semi-transparent, like the player
-	-- glyph view); flatten the content inset + rock.
-	local function SkinGlyphs()
-		local frame = _G.InspectGlyphFrame
-		if not frame then return end
-		hideRockRegions(frame)
-		flattenInset(frame.contentInset or _G.InspectGlyphFrameContentInset)
-		if _G.InspectGlyphFrameBackground then _G.InspectGlyphFrameBackground:SetAlpha(0.6) end
-	end
-
-	-- Runes: native circle untouched; just blank the host chrome.
-	local function SkinRunes()
-		local host = _G.InspectRuneFrameHost
-		if not host then return end
-		blankTextureRegions(host)
-		if host.CloseButton then host.CloseButton:Hide() end
-	end
-
-	local function SkinCurrentTab()
-		SkinPaperDoll()
-		SkinPVP()
-		SkinTalents()
-		SkinGlyphs()
-		SkinRunes()
-		FlattenChrome()
-	end
-	SkinCurrentTab()
-
-	if _G.TalentFrame_ApplyColumnInsets then
-		hooksecurefunc("TalentFrame_ApplyColumnInsets", function(tf)
-			if tf == _G.InspectTalentFrame then SkinTalentGrid() end
-		end)
-	end
-	if _G.InspectSwitchTabs then
-		hooksecurefunc("InspectSwitchTabs", SkinCurrentTab)
-	end
-	if _G.InspectFrame_OnShow then
-		hooksecurefunc("InspectFrame_OnShow", SkinCurrentTab)
 	end
 
 	-- ===================== average item level (once) =====================
