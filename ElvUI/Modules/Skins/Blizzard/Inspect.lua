@@ -11,9 +11,6 @@ local hooksecurefunc = hooksecurefunc
 local GetInventoryItemID = GetInventoryItemID
 local GetItemInfo = GetItemInfo
 local GetItemQualityColor = GetItemQualityColor
-local GetInventoryItemLink = GetInventoryItemLink
-local CreateFrame = CreateFrame
-local floor = math.floor
 
 -- base helpers: remove insets + backgrounds, as the player windows do.
 

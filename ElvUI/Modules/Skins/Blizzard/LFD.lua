@@ -306,7 +306,6 @@ do
 		a:SetPoint("CENTER", btn, "CENTER", 0, 0)
 		a:SetVertexColor(1, 1, 1)
 	end
-	S.NozdorSkinDropArrow = skinDropArrow
 
 	-- Finder dropdowns: the server re-lays-out the 3-slice holder + arrow every pass, and
 	-- HandleDropDownBox fought that (mangled the box, dropped its selected-value text).
@@ -330,7 +329,6 @@ do
 		dd.backdrop:Point("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 1)
 		skinDropArrow(button)
 	end
-	S.NozdorSkinFinderDropdown = skinFinderDropdown
 
 	-- Recursively flatten every inset + background texture in a frame subtree, and
 	-- skin any dropdown/scrollbar found along the way.
