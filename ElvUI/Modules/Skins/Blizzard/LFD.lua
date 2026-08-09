@@ -448,5 +448,19 @@ do
 			hooksecurefunc("HK_LFDShell_SetTab", SkinAll)
 		end
 		frame:HookScript("OnShow", SkinAll)
+
+		-- The bottom tab bar (HK_LFDTopTabBar, anchored below the window) sits 2px too
+		-- low. The server re-anchors it in HK_LFDShell_ApplyTopTabLayout, so nudge it
+		-- up 2px after each layout pass (re-reads the server points → no drift).
+		if _G.HK_LFDShell_ApplyTopTabLayout then
+			hooksecurefunc("HK_LFDShell_ApplyTopTabLayout", function()
+				local bar = _G.HK_LFDTopTabBar
+				if not bar then return end
+				local p1, r1, rp1, x1, y1 = bar:GetPoint(1)
+				local p2, r2, rp2, x2, y2 = bar:GetPoint(2)
+				if p1 then bar:SetPoint(p1, r1, rp1, x1, (y1 or 0) + 2) end
+				if p2 then bar:SetPoint(p2, r2, rp2, x2, (y2 or 0) + 2) end
+			end)
+		end
 	end)
 end
