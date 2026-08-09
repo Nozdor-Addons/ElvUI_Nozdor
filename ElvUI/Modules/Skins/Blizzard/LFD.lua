@@ -558,15 +558,36 @@ do
 			"HK_LFDSidebarBracket2v2Btn", "HK_LFDSidebarBracket3v3Btn",
 			"HK_LFDSidebarBracketRbgBtn",
 		}
+		-- Select/hover on a sidebar button, driven by the ElvUI backdrop border:
+		-- accent when the tab is active (server sets btn._hkActive in setSidebarTabState)
+		-- or hovered, dark otherwise.
+		local function sidebarBorder(b, hover)
+			if not b.backdrop then return end
+			if b._hkActive or hover then
+				b.backdrop:SetBackdropBorderColor(unpack(E.media.rgbvaluecolor))
+			else
+				b.backdrop:SetBackdropBorderColor(unpack(E.media.bordercolor))
+			end
+		end
 		local function SkinSidebarButtons()
 			for _, n in ipairs(SIDEBAR_BTNS) do
 				local b = _G[n]
-				if b and not b.__euiBackdrop and b.CreateBackdrop then
-					b.__euiBackdrop = true
-					b:CreateBackdrop("Transparent")
-					if b.backdrop and b.backdrop.SetFrameLevel then
-						b.backdrop:SetFrameLevel(math.max(0, (b:GetFrameLevel() or 1) - 1))
+				if b then
+					if not b.__euiBackdrop and b.CreateBackdrop then
+						b.__euiBackdrop = true
+						b:CreateBackdrop("Transparent")
+						if b.backdrop and b.backdrop.SetFrameLevel then
+							b.backdrop:SetFrameLevel(math.max(0, (b:GetFrameLevel() or 1) - 1))
+						end
 					end
+					-- Replace the server's own selection art with the ElvUI border accent.
+					if b.selection and b.selection.SetAlpha then b.selection:SetAlpha(0) end
+					if not b.__euiHover and b.HookScript then
+						b.__euiHover = true
+						b:HookScript("OnEnter", function(self) sidebarBorder(self, true) end)
+						b:HookScript("OnLeave", function(self) sidebarBorder(self, false) end)
+					end
+					sidebarBorder(b, false)
 				end
 			end
 		end
