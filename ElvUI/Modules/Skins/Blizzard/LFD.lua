@@ -275,7 +275,6 @@ do
 		"ui%-lfg%-background", "ui%-lfg%-bluebg", "ui%-frame",
 		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
 		"char%-paperdoll", "char%-inner", "%-goldborder", "common%-dropdown",
-		"common%-input%-border",
 	}
 	local function isBgTexture(t)
 		if type(t) ~= "string" then return false end
@@ -317,6 +316,32 @@ do
 	end
 	S.NozdorSkinDropArrow = skinDropArrow
 
+	-- Finder dropdowns are UIDropDownMenu-like frames whose 3-slice holder
+	-- (Left/Middle/Right = common-dropdown art) and arrow button the server re-lays-out
+	-- on every pass via HK_LFDShell_ApplyFinderDropdownLayout. Fighting that with
+	-- HandleDropDownBox mangled the box and dropped its selected-value text. Instead:
+	-- freeze the holder slices blank, lay a flat ElvUI backdrop over the holder geometry
+	-- (live-anchored to the server's own Left/Button so it tracks re-layout), swap in a
+	-- frozen ElvUI arrow, and leave the server's text + geometry untouched.
+	local function skinFinderDropdown(dd)
+		local name = dd and dd.GetName and dd:GetName()
+		if not name or dd.__euiDD then return end
+		local left, middle, right = _G[name.."Left"], _G[name.."Middle"], _G[name.."Right"]
+		local button = _G[name.."Button"]
+		if not (left and middle and right and button) then return end
+		dd.__euiDD = true
+		for _, t in ipairs({ left, middle, right }) do
+			t:SetTexture(nil); t:SetAlpha(0)
+			t.SetTexture = E.noop; t.SetAlpha = E.noop; t.Show = E.noop
+		end
+		if not dd.backdrop then dd:CreateBackdrop("Transparent") end
+		dd.backdrop:ClearAllPoints()
+		dd.backdrop:Point("TOPLEFT", left, "TOPLEFT", 0, -1)
+		dd.backdrop:Point("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 1)
+		skinDropArrow(button)
+	end
+	S.NozdorSkinFinderDropdown = skinFinderDropdown
+
 	-- Recursively flatten every inset + background texture in a frame subtree, and
 	-- skin any dropdown/scrollbar found along the way.
 	local function sweep(frame, depth)
@@ -345,15 +370,47 @@ do
 				frame:CreateBackdrop("Transparent")
 			end
 		end
-		-- Own decorative background texture regions.
+		-- Own decorative background textures + detect finder input fields (they carry a
+		-- common-input-border texture we must replace, not merely blank).
+		local hasInputBorder = false
 		if frame.GetRegions then
 			for _, r in ipairs({ frame:GetRegions() }) do
-				if r.GetObjectType and r:GetObjectType() == "Texture" and r.GetTexture and isBgTexture(r:GetTexture()) then
-					r:SetAlpha(0)
+				if r.GetObjectType and r:GetObjectType() == "Texture" and r.GetTexture then
+					local tex = r:GetTexture()
+					if type(tex) == "string" and tex:lower():find("common%-input%-border") then
+						hasInputBorder = true
+						r:SetAlpha(0)
+					elseif isBgTexture(tex) then
+						r:SetAlpha(0)
+					end
 				end
 			end
 		end
-		-- Dropdowns / scrollbars found anywhere in the tree.
+		-- Finder input field (HKFinder*InputBorderTemplate): a Frame carrying the input
+		-- border, an inner editBox and a placeholder fontstring ON THE FIELD. Backdrop the
+		-- FIELD, not the inner editBox — an editBox backdrop draws over the placeholder and
+		-- hides it. Mark the inner editBox so the editbox branch below skips it.
+		local innerEdit = frame.editBox or frame.searchBox
+		if (hasInputBorder or (innerEdit and frame.placeholder)) and not frame.__euiInputField then
+			frame.__euiInputField = true
+			-- Mark every editbox child (named or not, key set or not) so the editbox
+			-- branch skips it — its own backdrop would draw over the field's placeholder.
+			if innerEdit then innerEdit.__euiSkipEditBox = true end
+			if frame.GetChildren then
+				for _, c in ipairs({ frame:GetChildren() }) do
+					if c.GetObjectType and c:GetObjectType() == "EditBox" then
+						c.__euiSkipEditBox = true
+					end
+				end
+			end
+			if not frame.backdrop and frame.CreateBackdrop then
+				frame:CreateBackdrop("Transparent")
+				if frame.backdrop.SetFrameLevel then
+					frame.backdrop:SetFrameLevel(math.max(0, (frame:GetFrameLevel() or 1) - 1))
+				end
+			end
+		end
+		-- Dropdowns / scrollbars / buttons / editboxes found anywhere in the tree.
 		local name = frame.GetName and frame:GetName()
 		if name and not frame.__euiFinder then
 			local ot = frame.GetObjectType and frame:GetObjectType()
@@ -361,9 +418,12 @@ do
 				frame.__euiFinder = true
 				if S.HandleScrollBar then S:HandleScrollBar(frame) end
 			elseif ot == "EditBox" then
-				-- Search fields etc.
-				frame.__euiFinder = true
-				if S.HandleEditBox then S:HandleEditBox(frame) end
+				-- Standalone search/input boxes. Skip inner editBoxes of input fields
+				-- (skinned via the field above) so the placeholder stays visible.
+				if not frame.__euiSkipEditBox then
+					frame.__euiFinder = true
+					if S.HandleEditBox then S:HandleEditBox(frame) end
+				end
 			elseif ot == "Button" and _G[name.."Left"] and _G[name.."Middle"] and _G[name.."Right"] then
 				-- 3-slice UIPanelButtonTemplate (e.g. HK_PvpDevContainerJoinBtn).
 				frame.__euiFinder = true
@@ -371,17 +431,7 @@ do
 			elseif ot ~= "Button" and _G[name.."Button"] and _G[name.."Middle"] then
 				-- Dropdown (UIDropDownMenu-like): a Frame with an arrow button + middle.
 				frame.__euiFinder = true
-				if S.HandleDropDownBox then S:HandleDropDownBox(frame) end
-				-- The server re-applies its custom holder + arrow textures on hover, so
-				-- blanking once isn't enough — blank AND freeze the setters.
-				for _, sfx in ipairs({ "Left", "Middle", "Right" }) do
-					local t = _G[name..sfx]
-					if t then
-						t:SetTexture(nil); t:SetAlpha(0)
-						t.SetTexture = E.noop; t.SetAlpha = E.noop; t.Show = E.noop
-					end
-				end
-				skinDropArrow(_G[name.."Button"])
+				skinFinderDropdown(frame)
 			end
 		end
 		-- Recurse into child frames.
@@ -463,9 +513,10 @@ do
 			local q = _G.LFDQueueFrame
 			if q and q.backdrop and _G.HK_LFDSidebar then
 				q.backdrop:ClearAllPoints()
-				-- Shifted 1px left so the darkening lines up with the PVE rewards content.
+				-- Left edge 1px in, right edge pulled a further 1px in, so the darkening
+				-- lines up with the PVE rewards content on both sides.
 				q.backdrop:Point("TOPLEFT", _G.HK_LFDSidebar, "TOPRIGHT", 3, 0)
-				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -4, 4)
+				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -5, 4)
 			end
 		end
 
@@ -492,6 +543,16 @@ do
 			hooksecurefunc("HK_LFDShell_SetTab", SkinAll)
 		end
 		frame:HookScript("OnShow", SkinAll)
+
+		-- Dropdowns are laid out (and re-textured) by the server's finder layout pass,
+		-- which can run after a SkinAll for dropdowns created lazily on a tab. Re-skin
+		-- each dropdown right after the server lays it out (skinFinderDropdown is a
+		-- one-shot per frame, so repeat calls are cheap no-ops once frozen).
+		if _G.HK_LFDShell_ApplyFinderDropdownLayout then
+			hooksecurefunc("HK_LFDShell_ApplyFinderDropdownLayout", function(dd)
+				skinFinderDropdown(dd)
+			end)
+		end
 
 		-- The bottom tab bar (HK_LFDTopTabBar, anchored below the window) sits 2px too
 		-- low. The server re-anchors it in HK_LFDShell_ApplyTopTabLayout, so nudge it
