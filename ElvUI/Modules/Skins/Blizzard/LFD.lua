@@ -395,15 +395,25 @@ do
 			frame.__euiInputField = true
 			-- Mark every editbox child (named or not, key set or not) so the editbox
 			-- branch skips it — its own backdrop would draw over the field's placeholder.
+			-- Also note multiline fields: they reparent their editbox into a ScrollFrame
+			-- with a focus button (HK_Finder_WireMultilineEditBox). Those manage their own
+			-- interactive stack, so leave them untouched beyond blanking the border — an
+			-- extra child backdrop here disturbed the description field's click-to-focus.
+			local isMultiline = frame._hkDescScroll ~= nil
 			if innerEdit then innerEdit.__euiSkipEditBox = true end
 			if frame.GetChildren then
 				for _, c in ipairs({ frame:GetChildren() }) do
-					if c.GetObjectType and c:GetObjectType() == "EditBox" then
-						c.__euiSkipEditBox = true
+					if c.GetObjectType then
+						local t = c:GetObjectType()
+						if t == "EditBox" then
+							c.__euiSkipEditBox = true
+						elseif t == "ScrollFrame" then
+							isMultiline = true
+						end
 					end
 				end
 			end
-			if not frame.backdrop and frame.CreateBackdrop then
+			if not isMultiline and not frame.backdrop and frame.CreateBackdrop then
 				frame:CreateBackdrop("Transparent")
 				if frame.backdrop.SetFrameLevel then
 					frame.backdrop:SetFrameLevel(math.max(0, (frame:GetFrameLevel() or 1) - 1))
@@ -513,10 +523,10 @@ do
 			local q = _G.LFDQueueFrame
 			if q and q.backdrop and _G.HK_LFDSidebar then
 				q.backdrop:ClearAllPoints()
-				-- Left edge 1px in, right edge pulled a further 1px in, so the darkening
-				-- lines up with the PVE rewards content on both sides.
+				-- Left edge 1px in; right edge stretched 1px out so the darkening lines up
+				-- with the PVE rewards content on both sides.
 				q.backdrop:Point("TOPLEFT", _G.HK_LFDSidebar, "TOPRIGHT", 3, 0)
-				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -5, 4)
+				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -4, 4)
 			end
 		end
 
