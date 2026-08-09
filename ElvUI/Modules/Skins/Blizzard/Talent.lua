@@ -224,38 +224,7 @@ do
 	end
 	SkinGridColumns()
 
-	-- Rune selection popup (opens on rune-slot click). It's a server
-	-- ButtonFrameTemplate decorated with MetalFrame2X, but only the close button
-	-- was styled; the rock background, recessed marble inset, action buttons and
-	-- scrollbar are left stock. Skin them to match the rest of the ElvUI window.
-	-- The panel (UlduarRuneSelectionPanel) is created lazily on first rune click,
-	-- so skin it right after the (global) click handler builds it.
-	local function SkinRunePopup()
-		local panel = _G.UlduarRuneSelectionPanel
-		if not panel or panel.__euiSkinned then return end
-		panel.__euiSkinned = true
-
-		panel:CreateBackdrop("Transparent")
-		panel.backdrop:Point("TOPLEFT", 2, -2)
-		panel.backdrop:Point("BOTTOMRIGHT", -2, 2)
-
-		-- Metal border + close button -> ElvUI.
-		if S.HandleMetalFrame then S:HandleMetalFrame(panel, panel.backdrop) end
-
-		-- Rock background + recessed marble inset -> flat backdrop.
-		if panel.Bg then panel.Bg:SetTexture(nil); panel.Bg:SetAlpha(0) end
-		if panel.Inset then
-			panel.Inset:StripTextures()
-			if panel.Inset.Bgs then panel.Inset.Bgs:SetTexture(nil); panel.Inset.Bgs:SetAlpha(0) end
-		end
-
-		if _G.UlduarRuneActivateButton then S:HandleButton(_G.UlduarRuneActivateButton) end
-		if _G.UlduarRuneRemoveAllButton then S:HandleButton(_G.UlduarRuneRemoveAllButton) end
-		if _G.UlduarRuneScrollFrameScrollBar then S:HandleScrollBar(_G.UlduarRuneScrollFrameScrollBar) end
-	end
-	if _G.UlduarSecretsFrame_BrightRunes_OnClick then
-		hooksecurefunc("UlduarSecretsFrame_BrightRunes_OnClick", SkinRunePopup)
-	end
+	-- Rune-view chrome and the rune selection popup are skinned in Runes.lua.
 
 	--PlayerTalentFramePreviewBarFiller:StripTextures()
 
