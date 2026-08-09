@@ -428,9 +428,21 @@ do
 				frame.__euiFinder = true
 				if S.HandleScrollBar then S:HandleScrollBar(frame) end
 			elseif ot == "EditBox" then
-				-- Standalone search/input boxes. Skip inner editBoxes of input fields
-				-- (skinned via the field above) so the placeholder stays visible.
-				if not frame.__euiSkipEditBox then
+				-- Standalone search/input boxes. Skip editboxes that belong to a finder
+				-- input field — an editbox backdrop draws over the field's placeholder, and
+				-- for the multiline description it lands as an opaque box that swallows the
+				-- click-to-focus. Multiline fields reparent their (named) editbox into a
+				-- ScrollFrame, so the field flag isn't on the direct parent — walk up a few.
+				local skip = frame.__euiSkipEditBox
+				if not skip then
+					local p = frame
+					for _ = 1, 4 do
+						p = p and p.GetParent and p:GetParent()
+						if not p then break end
+						if p.__euiInputField then skip = true; break end
+					end
+				end
+				if not skip then
 					frame.__euiFinder = true
 					if S.HandleEditBox then S:HandleEditBox(frame) end
 				end
@@ -523,10 +535,10 @@ do
 			local q = _G.LFDQueueFrame
 			if q and q.backdrop and _G.HK_LFDSidebar then
 				q.backdrop:ClearAllPoints()
-				-- Left edge 1px in; right edge stretched 1px out so the darkening lines up
+				-- Left edge 1px in; right edge stretched 2px out so the darkening lines up
 				-- with the PVE rewards content on both sides.
 				q.backdrop:Point("TOPLEFT", _G.HK_LFDSidebar, "TOPRIGHT", 3, 0)
-				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -4, 4)
+				q.backdrop:Point("BOTTOMRIGHT", q, "BOTTOMRIGHT", -3, 4)
 			end
 		end
 
