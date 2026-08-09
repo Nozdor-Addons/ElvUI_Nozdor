@@ -637,6 +637,21 @@ do
 			freezeHidden(_G.PVPSpectatorFramePortrait)
 			freezeHidden(_G.PVPSpectatorFramePortraitModel)
 			freezeHidden(_G.PVPSpectatorFramePortraitModelModel)
+			-- The refresh button is a plain 128RedButton icon (not a 3-slice UIPanelButton,
+			-- so the sweep skips it). Give it an ElvUI backdrop + the clean UI-RefreshButton
+			-- icon the rest of the finder already uses.
+			local rb = _G.PVPSpectatorFrameRefreshButton
+			if rb and not rb.__euiSkinned then
+				rb.__euiSkinned = true
+				rb:StripTextures()
+				if not rb.backdrop then rb:CreateBackdrop("Default") end
+				rb:SetNormalTexture("Interface\\Buttons\\UI-RefreshButton")
+				rb:SetPushedTexture("Interface\\Buttons\\UI-RefreshButton")
+				rb:SetHighlightTexture("Interface\\Buttons\\UI-RefreshButton")
+				for _, t in ipairs({ rb:GetNormalTexture(), rb:GetPushedTexture(), rb:GetHighlightTexture() }) do
+					if t then t:SetInside(rb.backdrop, 1, 1); t:SetTexCoord(0, 1, 0, 1) end
+				end
+			end
 		end
 		if _G.HK_LFDShell_ApplySpectatorContentLayout then
 			hooksecurefunc("HK_LFDShell_ApplySpectatorContentLayout", SkinSpectator)
