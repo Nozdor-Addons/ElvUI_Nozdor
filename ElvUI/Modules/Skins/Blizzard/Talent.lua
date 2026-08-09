@@ -131,9 +131,34 @@ do
 	PlayerTalentFrameResetButton:Point("RIGHT", -4, 1)
 	PlayerTalentFrameLearnButton:Point("RIGHT", PlayerTalentFrameResetButton, "LEFT", -3, 0)
 
-	PlayerSpecTab1:Point("TOPLEFT", PlayerTalentFrame, "TOPRIGHT", -33, -65)
-	PlayerSpecTab1.ClearAllPoints = E.noop
-	PlayerSpecTab1.SetPoint = E.noop
+	-- Bottom tabs: sit outside below PlayerTalentFrame
+	if PlayerTalentFrameTab1 then
+		PlayerTalentFrameTab1:ClearAllPoints()
+		PlayerTalentFrameTab1:Point("BOTTOMLEFT", PlayerTalentFrame, "BOTTOMLEFT", 11, -30)
+	end
+	if PlayerTalentFrameTab2 then
+		PlayerTalentFrameTab2:ClearAllPoints()
+		PlayerTalentFrameTab2:Point("LEFT", PlayerTalentFrameTab1, "RIGHT", -15, 0)
+	end
+	if PlayerTalentFrameTab3 then
+		PlayerTalentFrameTab3:ClearAllPoints()
+		PlayerTalentFrameTab3:Point("LEFT", PlayerTalentFrameTab2, "RIGHT", -15, 0)
+	end
 
-	PlayerTalentFrameTab1:Point("BOTTOMLEFT", 11, 46)
+	-- Right-side specialization tabs: sit outside to the right of PlayerTalentFrame
+	if PlayerSpecTab1 then
+		PlayerSpecTab1:ClearAllPoints()
+		PlayerSpecTab1:Point("TOPLEFT", PlayerTalentFrame, "TOPRIGHT", 1, -40)
+		PlayerSpecTab1.ClearAllPoints = E.noop
+		PlayerSpecTab1.SetPoint = E.noop
+	end
+
+	for i = 2, 10 do
+		local tab = _G["PlayerSpecTab"..i]
+		local prev = _G["PlayerSpecTab"..(i - 1)]
+		if tab and prev then
+			tab:ClearAllPoints()
+			tab:Point("TOPLEFT", prev, "BOTTOMLEFT", 0, -5)
+		end
+	end
 end)
