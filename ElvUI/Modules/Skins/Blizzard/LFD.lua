@@ -244,12 +244,17 @@ end)
 -- NOZDOR "Finder" redesign (LFDParentFrame inherits MetalFrame2X natively;
 -- the HK_LFDShell re-decorates on every view switch). Applied as its own
 -- callback so a crash in the stock LFD skin above can't block it.
--- Pass 1: tabs + PVE (Dungeons) view — flatten chrome/ring/eye, remove the
--- rock/heroic/blue backgrounds + insets, skin the dropdown.
+--
+-- Rather than name every HK_ inset/background one by one, RECURSIVELY sweep the
+-- whole finder subtree: flatten any InsetFrameTemplate (Bgs + border pieces) and
+-- blank any texture whose file is a known decorative background (rock / marble /
+-- blue menu / pvp queue / LFG bg / _UI-Frame inset border / questpaper). Re-run on
+-- every view switch + show.
 -- =====================================================================
 do
 	local _G = _G
 	local ipairs = ipairs
+	local type = type
 	local hooksecurefunc = hooksecurefunc
 
 	local INSET_BORDER = {
@@ -258,21 +263,48 @@ do
 		"InsetBorderTop", "InsetBorderBottom", "InsetBorderLeft", "InsetBorderRight",
 	}
 
+	-- Decorative background art paths anywhere in the finder tree.
+	local BG_PATTERNS = {
+		"ui%-background%-rock", "ui%-background%-marble", "bluemenu%-main",
+		"pvpqueue", "ui%-lfg%-background", "ui%-lfg%-bluebg", "_ui%-frame",
+		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
+	}
+	local function isBgTexture(t)
+		if type(t) ~= "string" then return false end
+		local lt = t:lower()
+		for _, p in ipairs(BG_PATTERNS) do
+			if lt:find(p) then return true end
+		end
+		return false
+	end
+
 	local function hide(obj)
 		if obj and obj.SetAlpha then obj:SetAlpha(0) end
 	end
-	local function flattenInset(inset)
-		if not inset then return end
+
+	-- Recursively flatten every inset + background texture in a frame subtree.
+	local function sweep(frame, depth)
+		depth = depth or 0
+		if not frame or depth > 10 then return end
+		-- InsetFrameTemplate marble + border pieces (parentKeys).
 		for _, key in ipairs(INSET_BORDER) do
-			local r = inset[key]
-			if r then r:SetAlpha(0); if r.Hide then r:Hide() end end
+			local r = frame[key]
+			if r and r.SetAlpha then r:SetAlpha(0); if r.Hide then r:Hide() end end
 		end
-		if inset.Bgs then inset.Bgs:SetAlpha(0) end
-	end
-	local function blankTextureRegions(frame)
-		if not frame or not frame.GetRegions then return end
-		for _, r in ipairs({ frame:GetRegions() }) do
-			if r.GetObjectType and r:GetObjectType() == "Texture" then r:SetAlpha(0) end
+		if frame.Bgs and frame.Bgs.SetAlpha then frame.Bgs:SetAlpha(0) end
+		-- Own decorative background texture regions.
+		if frame.GetRegions then
+			for _, r in ipairs({ frame:GetRegions() }) do
+				if r.GetObjectType and r:GetObjectType() == "Texture" and r.GetTexture and isBgTexture(r:GetTexture()) then
+					r:SetAlpha(0)
+				end
+			end
+		end
+		-- Recurse into child frames.
+		if frame.GetChildren then
+			for _, c in ipairs({ frame:GetChildren() }) do
+				sweep(c, depth + 1)
+			end
 		end
 	end
 
@@ -297,36 +329,18 @@ do
 			if _G.HK_LFDPortraitFrame then _G.HK_LFDPortraitFrame:Hide() end
 		end
 
-		-- Backgrounds (rock / heroic / blue role strip / sidebar) + all HK insets.
-		local INSET_NAMES = {
-			"HK_LFDDescInset", "HK_LFDDescInsetCategoryInset",
+		-- Dropdowns (dungeon/role + premade selectors).
+		local DROPDOWNS = {
+			"LFDQueueFrameTypeDropDown",
+			"HK_PremadeContainerDungeonDropDown", "HK_PremadeContainerDifficultyDropDown",
 		}
-		local function FlattenBackgrounds()
-			-- Full-window rock bg (runtime child frame HK_LFDRockBg with .rock).
-			local rock = _G.HK_LFDRockBg
-			if rock then
-				if rock.rock then hide(rock.rock) end
-				blankTextureRegions(rock)
-			end
-			-- Heroic description bg + role-strip blue bg.
-			if _G.HK_LFDDescHeroicBg then hide(_G.HK_LFDDescHeroicBg.HeroicBg) end
-			if _G.HK_LFDRoleInset then hide(_G.HK_LFDRoleInset.BlueBg) end
-			-- Sidebar chrome (blue menu bg + corners).
-			if _G.HK_LFDSidebarBg then blankTextureRegions(_G.HK_LFDSidebarBg) end
-			hide(_G.HK_LFDSidebarBgBlueBg)
-			-- Stock questpaper bg.
-			hide(_G.LFDQueueFrameBackground)
-			-- Flatten the named InsetFrameTemplate insets.
-			for _, n in ipairs(INSET_NAMES) do flattenInset(_G[n]) end
-			flattenInset(_G.HK_LFDRoleInset)
-		end
-
-		-- Dropdown (dungeon/role selection).
 		local function SkinDropdowns()
-			local dd = _G.LFDQueueFrameTypeDropDown
-			if dd and not dd.__euiSkinned then
-				dd.__euiSkinned = true
-				if S.HandleDropDownBox then S:HandleDropDownBox(dd) end
+			for _, n in ipairs(DROPDOWNS) do
+				local dd = _G[n]
+				if dd and not dd.__euiSkinned then
+					dd.__euiSkinned = true
+					if S.HandleDropDownBox then S:HandleDropDownBox(dd) end
+				end
 			end
 		end
 
@@ -347,11 +361,21 @@ do
 			end
 		end
 
+		-- Battle Pass sidebar button -> ElvUI button.
+		local function SkinButtons()
+			local bp = _G.HK_LFDBattlePassButton
+			if bp and not bp.__euiSkinned then
+				bp.__euiSkinned = true
+				if S.HandleButton then S:HandleButton(bp) end
+			end
+		end
+
 		local function SkinAll()
 			FlattenChrome()
-			FlattenBackgrounds()
+			sweep(frame, 0)
 			SkinDropdowns()
 			SkinTabs()
+			SkinButtons()
 		end
 		SkinAll()
 
