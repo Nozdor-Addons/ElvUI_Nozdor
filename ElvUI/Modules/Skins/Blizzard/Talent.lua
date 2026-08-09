@@ -67,6 +67,18 @@ do
 		-- numTalentGroups, numPetTalentGroups
 		-- force = true
 		local function UpdateTalentFrameOffset(numTalentGroups, numPetTalentGroups, force)
+			-- The server pins the rune view to 512 wide so its native circle stays
+			-- round. The dual-spec width offset would inflate the window and stretch
+			-- the circle into an oval, so never add it while the rune host is shown.
+			local runeHost = PlayerTalentFrame.RuneHost
+			if runeHost and runeHost:IsShown() then
+				if force or PlayerTalentFrame.ElvUI_OffsetActive then
+					S:SetUIPanelWindowInfo(PlayerTalentFrame, "width")
+					PlayerTalentFrame.ElvUI_OffsetActive = false
+				end
+				return
+			end
+
 			if not numTalentGroups or not numPetTalentGroups then
 				numTalentGroups = GetNumTalentGroups(false, false)
 				numPetTalentGroups = GetNumTalentGroups(false, true)
@@ -96,14 +108,18 @@ do
 				UpdateTalentFrameOffset(numTalentGroups, numPetTalentGroups)
 			end)
 
-			-- Rune view sizing/layout is owned by Runes.lua (the ported iqxaxb
-			-- solution); don't touch the window width here. Only hide the RuneHost's
-			-- own old close button, which sits alongside the new metal close button
-			-- (it's a child frame, so the server's region-hide loop never reaches it).
+			-- Re-run the offset logic when entering/leaving the rune view so the window
+			-- snaps to the server's 512-wide (round-circle) size and back. Rune-view
+			-- chrome (metal frame, RuneHost.Bg/close) is handled in Runes.lua; the
+			-- native circle layout is left entirely to the server.
 			if _G.PlayerTalentFrame_ShowRuneFrame then
 				hooksecurefunc("PlayerTalentFrame_ShowRuneFrame", function()
-					local rh = PlayerTalentFrame.RuneHost
-					if rh and rh.CloseButton then rh.CloseButton:Hide() end
+					UpdateTalentFrameOffset(nil, nil, true)
+				end)
+			end
+			if _G.PlayerTalentFrame_HideRuneFrame then
+				hooksecurefunc("PlayerTalentFrame_HideRuneFrame", function()
+					UpdateTalentFrameOffset(nil, nil, true)
 				end)
 			end
 		end
