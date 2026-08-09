@@ -272,6 +272,7 @@ do
 		"pvpqueue", "ui%-lfg%-background", "ui%-lfg%-bluebg", "ui%-frame",
 		"pvp%-conquest", "questpaper", "dressupbackground", "uigroupfinderflipbook",
 		"char%-paperdoll", "char%-inner", "%-goldborder", "common%-dropdown",
+		"common%-input%-border",
 	}
 	local function isBgTexture(t)
 		if type(t) ~= "string" then return false end
@@ -328,11 +329,16 @@ do
 			if ot == "Slider" and name:find("ScrollBar$") then
 				frame.__euiFinder = true
 				if S.HandleScrollBar then S:HandleScrollBar(frame) end
+			elseif ot == "EditBox" then
+				-- Search fields etc.
+				frame.__euiFinder = true
+				if S.HandleEditBox then S:HandleEditBox(frame) end
 			elseif ot == "Button" and _G[name.."Left"] and _G[name.."Middle"] and _G[name.."Right"] then
 				-- 3-slice UIPanelButtonTemplate (e.g. HK_PvpDevContainerJoinBtn).
 				frame.__euiFinder = true
 				if S.HandleButton then S:HandleButton(frame) end
-			elseif ot ~= "Button" and _G[name.."Button"] and _G[name.."Text"] and _G[name.."Middle"] then
+			elseif ot ~= "Button" and _G[name.."Button"] and _G[name.."Middle"] then
+				-- Dropdown (UIDropDownMenu-like): a Frame with an arrow button + middle.
 				frame.__euiFinder = true
 				if S.HandleDropDownBox then S:HandleDropDownBox(frame) end
 			end
@@ -440,6 +446,9 @@ do
 		local function SkinAll()
 			FlattenChrome()
 			sweep(frame, 0)
+			-- The spectate view (PVPSpectatorFrame) is a sibling frame, not a child of
+			-- LFDParentFrame — sweep it too so its buttons/backgrounds get done.
+			if _G.PVPSpectatorFrame then sweep(_G.PVPSpectatorFrame, 0) end
 			SkinTabs()
 			SkinButtons()
 			FixContentBackdrop()
